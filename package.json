@@ -1,0 +1,20 @@
+{
+  "name": "automation-exercise-e2e",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Independent Playwright journeys for registration and product discovery",
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "test:smoke": "playwright test --grep @smoke",
+    "test:ui": "playwright test --ui",
+    "typecheck": "tsc --noEmit",
+    "report": "playwright show-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.64.1",
+    "typescript": "7.0.2",
+    "@types/node": "26.6.5",
+    "dotenv": "18.0.9"
+  }
+}

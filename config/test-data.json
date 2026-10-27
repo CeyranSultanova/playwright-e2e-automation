@@ -1,0 +1,10 @@
+{
+  "user": {
+    "name": "QA Shopper", "password": "TestOnly!9274", "emailDomain": "example.com",
+    "firstname": "QA", "lastname": "Shopper", "company": "QA Lab",
+    "address1": "14 Test Street", "address2": "Suite 2", "country": "Canada",
+    "state": "Ontario", "city": "Toronto", "zipcode": "M5V 1A1", "mobile_number": "4165550123",
+    "title": "Mr", "birth_date": "15", "birth_month": "6", "birth_year": "1994"
+  },
+  "product": {"id": 1, "name": "Blue Top", "price": "Rs. 500", "unitPrice": 500, "availability": "In Stock", "quantity": 3, "partialTerm": "blue"}
+}
