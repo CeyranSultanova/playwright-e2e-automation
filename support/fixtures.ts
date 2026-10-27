@@ -1,18 +1,22 @@
 import { test as base, expect } from '@playwright/test';
 import { newAccount, deleteAccount, type Account } from './accounts';
+import { isAdUrl, handleAdOverlays, handleAdPopup } from './ads';
 
 export const test = base.extend<{ account: Account; adIsolation: void }>({
+  page: async ({ page }, use) => {
+    await handleAdOverlays(page);
+    page.on('popup', handleAdPopup);
+    await use(page);
+  },
   account: async ({ request }, use) => {
     const account = newAccount();
     try { await use(account); }
     finally { await deleteAccount(request, account); }
   },
   adIsolation: [async ({ context }, use) => {
-    const adHosts = ['doubleclick.net', 'googlesyndication.com', 'googleadservices.com', 'adservice.google.com', 'googletagservices.com'];
     if (process.env.BLOCK_ADS !== 'false') {
       await context.route('**/*', async route => {
-        const host = new URL(route.request().url()).hostname;
-        if (adHosts.some(domain => host === domain || host.endsWith(`.${domain}`))) await route.abort();
+        if (isAdUrl(route.request().url())) await route.abort();
         else await route.continue();
       });
     }

@@ -2,7 +2,7 @@
 
 Playwright + TypeScript tests for account registration and product discovery on [Automation Exercise](https://automationexercise.com). The suite prioritizes complete customer outcomes: an authenticated new account and the intended product added to a cart with the correct quantity and total.
 
-There are 18 independent tests: 13 registration cases and 5 search/cart cases. The original, prioritized case designs and deferred scenarios are in [docs/test-design.md](docs/test-design.md).
+There are 20 independent tests: 13 registration cases, 5 search/cart cases and 2 controlled browser checks for ad handling. The original, prioritized case designs and deferred scenarios are in [docs/test-design.md](docs/test-design.md).
 
 ## Install and run
 
@@ -15,7 +15,7 @@ npm run typecheck
 npm test
 ```
 
-`npm test` runs the complete suite in parallel with two workers and no local retries. No manually registered account or test ordering is needed. A typical run performs real writes on the configured application; use a target you are authorized to test.
+`npm test` runs the complete suite in parallel with two workers and no local retries. Run separate Playwright commands sequentially in this checkout because they share report and artifact directories. No manually registered account or test ordering is needed. A typical run performs real writes on the configured application; use a target you are authorized to test.
 
 ```sh
 npm run test:smoke       # Three business-critical journeys
@@ -37,7 +37,7 @@ Copy `.env.example` to `.env` when overrides are needed. Environment variables t
 | `BROWSERS` | `chromium` | Comma-separated selection of `chromium,firefox,webkit` |
 | `BLOCK_ADS` | `true` | Set `false` to diagnose behavior with real advertising |
 
-Names, addresses, password, email domain, date of birth, search terms, product ID, expected price/availability and cart quantity are configurable without changing test code. A replacement JSON file should preserve the supplied schema. Use a supported title/country and date; the product quantity must be an integer greater than one to exercise quantity changes. Configuration fails early for missing user fields or invalid core product values. Keep the displayed price and numeric unit price consistent.
+Names, addresses, password, email prefix/domain, date of birth, search terms, product ID, expected price/availability and cart quantity are configurable without changing test code. A replacement JSON file should preserve the supplied schema. Use a supported title/country and date; the product quantity must be an integer greater than one to exercise quantity changes. Configuration fails early for missing user fields or invalid core product values. Keep the displayed price and numeric unit price consistent.
 
 ```sh
 BASE_URL=https://automationexercise.com WORKERS=2 npm test
@@ -55,6 +55,7 @@ config/test-data.json        Editable synthetic user and catalogue expectations
 pages/                      Small page objects for shared signup/search actions
 support/accounts.ts         Unique identities and verified API lifecycle
 support/fixtures.ts         Per-test ownership and advertisement isolation
+support/ads.ts              Ad frame dismissal and ad-tab handling
 support/settings.ts         Environment and fixture loading
 tests/                     Business assertions and parameterized validation cases
 docs/test-design.md        Priorities, cases, expected outcomes and exclusions
@@ -67,7 +68,7 @@ The mandatory-field matrix clears one field at a time from a valid form, so each
 
 ## Data ownership and cleanup
 
-Each registration test receives a fresh UUID email at fixture setup, including every retry and browser project. Duplicate-email setup uses the public API, while the successful registration journey uses the full UI. Credentials in the checked-in fixture are synthetic and must never be reused for real accounts.
+Each registration test uses a unique plus-address alias of `ceyrantest@gmail.com`, for example `ceyrantest+8a25d419b7e1429f@gmail.com`. The suffix uses 16 random UUID hex characters and is regenerated for every retry and browser project. Set `user.emailPrefix` and `user.emailDomain` in the JSON fixture to change the base address. Duplicate-email setup uses the public API, while the successful registration journey uses the full UI. Credentials in the checked-in fixture are synthetic and must never be reused for real accounts.
 
 Fixture teardown runs in `finally`, even if setup or a UI assertion fails after an account was created. It attempts API deletion for its own email, accepts only deletion/not-found application response codes, then calls verify-login and requires not-found. Both HTTP success and the API's JSON `responseCode` are checked because this service reports application status inside the response body. Cleanup errors remain test failures; they are not swallowed.
 
@@ -79,7 +80,9 @@ A killed process, machine loss or unavailable deletion endpoint can prevent tear
 
 An automatic fixture installs context-wide routing before any test page navigates. It blocks requests to a small explicit set of known advertising domains and their subdomains: DoubleClick, Google syndication, ad services and tag services. This prevents their overlays and click-triggered ad windows at their source. First-party application, cart and account requests remain real. Service workers are disabled so they cannot bypass routing.
 
-The suite does not hide arbitrary overlays, remove DOM elements, blanket-block third parties or force clicks through obstructions. Unexpected JavaScript dialogs are dismissed and reported as errors. New ad providers or regional consent overlays may require an explicit reviewed handler; no unobserved consent behavior is fabricated. `BLOCK_ADS=false` supports reproduction. Blocking ads changes the page's integration environment and disables browser cache through request routing; this suite is not an advertising, consent or performance acceptance test.
+If an ad still loads, a locator handler checks recognized advertising frames before UI actions and clicks their Close ad / dismissal control. This covers the Google vignette observed during live inspection. New tabs navigating to the listed ad domains are closed; application tabs remain open. The two controlled browser checks verify ad dismissal while preserving the cart confirmation and application tabs. They use local responses for ad URLs so the checks do not depend on ad delivery.
+
+The suite does not hide arbitrary overlays, remove application DOM elements, blanket-block third parties or force clicks through obstructions. Unexpected JavaScript dialogs are dismissed and reported as errors. New ad providers or regional consent overlays may require an explicit reviewed handler. `BLOCK_ADS=false npm run test:headed` allows real ads to load while keeping the close handlers active. These handlers apply inside Playwright sessions; they do not change your normal browser settings. Blocking ads changes the page's integration environment and disables browser cache through request routing; this suite is not an advertising, consent or performance acceptance test.
 
 ## CI and reports
 

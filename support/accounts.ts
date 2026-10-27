@@ -3,8 +3,9 @@ import { randomUUID } from 'node:crypto';
 import { data } from './settings';
 export type Account = ReturnType<typeof newAccount>;
 export function newAccount() {
-  const { emailDomain, ...fields } = data.user;
-  return { ...fields, email: `qa-${randomUUID()}@${emailDomain}` };
+  const { emailDomain, emailPrefix, ...fields } = data.user;
+  const suffix = randomUUID().replaceAll('-', '').slice(0, 16);
+  return { ...fields, email: `${emailPrefix}+${suffix}@${emailDomain}` };
 }
 export async function createAccount(api: APIRequestContext, account: Account) {
   const response = await api.post('/api/createAccount', { form: account });

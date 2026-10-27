@@ -6,7 +6,7 @@ These cases were designed from the requested user journeys and observed UI behav
 
 P0 protects the two primary customer outcomes: creating an authenticated account and finding/purchasing the intended item. P1 protects common mistakes and search recovery. P2 cases remain exploratory because their expected behavior requires a product decision, or their value is lower than the core paths. The public site is a shared external dependency: tests own accounts and browser sessions, but cannot provision its product catalogue.
 
-Every automated test gets a fresh browser context. Every registration test, including validation cases, gets a UUID email and a teardown that attempts deletion and confirms login no longer works. Product tests use the existing read-only catalogue; each cart is isolated by its anonymous session. The cart journey explicitly removes its item; context disposal also discards the anonymous session on failure.
+Every automated test gets a fresh browser context. Every registration test, including validation cases, gets a unique plus-address email and a teardown that attempts deletion and confirms login no longer works. Product tests use the existing read-only catalogue; each cart is isolated by its anonymous session. The cart journey explicitly removes its item; context disposal also discards the anonymous session on failure.
 
 ## Automated registration cases
 
@@ -52,3 +52,10 @@ Product expectations come from versioned, configurable fixture data, not a live 
 Release evidence requires type checking and a complete parallel run without failures. CI retries once for diagnostics, but a retry-pass is still a flaky result requiring investigation; it is not equivalent to a clean first-pass run. Cleanup failures fail the test. Changes to catalogue data should be reviewed and applied to configuration, not hidden by weakened assertions.
 
 Live discovery: `top` also matches category metadata, including Little Girls Mr. Panda Shirt in Tops & Shirts. The partial-name case uses `blue` to exercise multiple name matches. A future category-search case should validate category metadata rather than incorrectly require every displayed name to include the term.
+
+## Ad-handling checks
+
+- ADS-01: Serve a controlled Google ad iframe with a close control. A blocked page action resumes after dismissal, while the cart confirmation remains visible.
+- ADS-02: Open a known advertising tab and an application tab. The advertising tab closes; the application tab remains usable.
+
+These two checks use controlled responses. They verify the handler boundaries separately from the 18 live end-to-end cases.
