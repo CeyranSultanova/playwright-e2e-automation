@@ -1,4 +1,4 @@
-# Automation Exercise tests
+# playwright-e2e
 
 Playwright and TypeScript tests for registration and product search on [Automation Exercise](https://automationexercise.com).
 
@@ -51,6 +51,39 @@ BROWSERS=firefox npm test
 Chromium is the browser used for local verification and CI. Test, assertion, action, navigation, API and cleanup timeouts are configurable through the `*_TIMEOUT_MS` variables in `.env.example`.
 
 ## How the suite is organised
+
+```text
+playwright-e2e/
+├── .github/
+│   └── workflows/
+│       └── e2e.yml
+├── config/
+│   └── test-data.json
+├── docs/
+│   ├── test-design.md
+│   └── validation.md
+├── pages/
+│   ├── cart-page.ts
+│   ├── product-page.ts
+│   ├── products-page.ts
+│   └── signup-page.ts
+├── support/
+│   ├── accounts.ts
+│   ├── ads.ts
+│   ├── fixtures.ts
+│   └── settings.ts
+├── tests/
+│   ├── registration.spec.ts
+│   ├── search.spec.ts
+│   └── ad-handling.spec.ts
+├── .env.example
+├── .gitignore
+├── package.json
+├── package-lock.json
+├── playwright.config.ts
+├── README.md
+└── tsconfig.json
+```
 
 - `tests/` contains the scenarios and assertions. Case IDs link to [the test design](docs/test-design.md).
 - `pages/` contains locators and actions for signup, product search, product details and cart. Business assertions stay in the test files; a shared search assertion lives in `search.spec.ts`.
