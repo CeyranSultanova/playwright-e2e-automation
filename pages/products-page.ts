@@ -1,21 +1,26 @@
-import { expect, type Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
+
 export class ProductsPage {
   constructor(readonly page: Page) {}
+
+  get heading() { return this.page.locator('.features_items > h2'); }
   get cards() { return this.page.locator('.features_items .product-image-wrapper'); }
+  get names() { return this.cards.locator('.productinfo p'); }
+  card(name: string) { return this.cards.filter({ has: this.page.getByText(name, { exact: true }) }); }
+
   async open() {
     await this.page.goto('/products', { waitUntil: 'domcontentloaded' });
-    await expect(this.page.getByRole('heading', { name: 'All Products', exact: true })).toBeVisible();
-    await expect(this.cards.first()).toBeVisible();
   }
+
   async search(term: string) {
     await this.page.locator('#search_product').fill(term);
-    await this.page.locator('#submit_search').click();
-    await expect(this.page.getByRole('heading', { name: term ? 'Searched Products' : 'All Products', exact: true })).toBeVisible();
+    await this.page.locator('#submit_search').click({ noWaitAfter: true });
+    await this.page.waitForURL(url => url.pathname === '/products' && url.searchParams.get('search') === term, {
+      waitUntil: 'domcontentloaded',
+    });
   }
-  async expectMatches(term: string) {
-    await expect(this.cards.first()).toBeVisible();
-    const names = await this.cards.locator('.productinfo p').allTextContents();
-    expect(names.length).toBeGreaterThan(0);
-    for (const name of names) expect(name.toLowerCase()).toContain(term.toLowerCase());
+
+  async openProduct(name: string) {
+    await this.card(name).getByRole('link', { name: 'View Product' }).click({ noWaitAfter: true });
   }
 }

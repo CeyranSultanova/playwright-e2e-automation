@@ -1,25 +1,45 @@
-import { expect, type APIRequestContext } from '@playwright/test';
+import type { APIRequestContext, APIResponse } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
-import { data } from './settings';
+import { data, settings } from './settings';
+
 export type Account = ReturnType<typeof newAccount>;
+type AccountResponse = { responseCode: number; message: string };
+
 export function newAccount() {
-  const { emailDomain, emailPrefix, ...fields } = data.user;
-  const suffix = randomUUID().replaceAll('-', '').slice(0, 16);
-  return { ...fields, email: `${emailPrefix}+${suffix}@${emailDomain}` };
+  const { emailDomain, emailPrefix, ...template } = data.user;
+  const suffix = randomUUID().replaceAll('-', '');
+  return {
+    ...template,
+    name: `${template.name} ${suffix.slice(0, 6)}`,
+    email: `${emailPrefix}+${suffix}@${emailDomain}`,
+    password: `${template.password}-${suffix}`,
+  };
 }
+
+async function readResponse(response: APIResponse): Promise<AccountResponse> {
+  if (!response.ok()) throw new Error(`Account API returned HTTP ${response.status()}`);
+  const body = await response.json();
+  // This API can return HTTP 200 with an application error in responseCode.
+  if (typeof body.responseCode !== 'number' || typeof body.message !== 'string') {
+    throw new Error('Account API returned an unexpected response body');
+  }
+  return body;
+}
+
 export async function createAccount(api: APIRequestContext, account: Account) {
-  const response = await api.post('/api/createAccount', { form: account });
-  expect(response.ok(), 'Create account HTTP status').toBeTruthy();
-  // The API reports application status in the response body too.
-  expect(await response.json()).toMatchObject({ responseCode: 201, message: 'User created!' });
+  return readResponse(await api.post('/api/createAccount', { form: account, timeout: settings.apiTimeout }));
 }
+
+export async function verifyAccount(api: APIRequestContext, account: Account) {
+  return readResponse(await api.post('/api/verifyLogin', {
+    form: { email: account.email, password: account.password },
+    timeout: settings.apiTimeout,
+  }));
+}
+
 export async function deleteAccount(api: APIRequestContext, account: Account) {
-  // Account creation may succeed even if the next UI step fails.
-  const response = await api.delete('/api/deleteAccount', { form: { email: account.email, password: account.password } });
-  expect(response.ok(), 'Cleanup HTTP status').toBeTruthy();
-  const result = await response.json();
-  expect([200, 404], 'Cleanup must delete the account or confirm it does not exist').toContain(result.responseCode);
-  const verification = await api.post('/api/verifyLogin', { form: { email: account.email, password: account.password } });
-  expect(verification.ok()).toBeTruthy();
-  expect(await verification.json(), 'Account must not survive teardown').toMatchObject({ responseCode: 404 });
+  return readResponse(await api.delete('/api/deleteAccount', {
+    form: { email: account.email, password: account.password },
+    timeout: settings.apiTimeout,
+  }));
 }

@@ -1,18 +1,24 @@
 import { test, expect } from '../support/fixtures';
+import { settings } from '../support/settings';
+
+const adOrigin = `https://${settings.adDomains[0]}`;
+const adOverlayUrl = `${adOrigin}/test-overlay`;
+const adPopupUrl = `${adOrigin}/test-popup`;
+const applicationUrl = new URL('/test-popup', settings.baseURL).href;
 
 // Serve the ad locally so these checks do not depend on live ad delivery.
 test('ADS-01 closes the ad and keeps the cart confirmation open', async ({ page }) => {
-  await page.route('https://googleads.g.doubleclick.net/test-overlay', route => route.fulfill({
+  await page.route(adOverlayUrl, route => route.fulfill({
     contentType: 'text/html',
     body: '<button id="dismiss-button" onclick="parent.postMessage(\'ad-dismissed\', \'*\')">Close ad</button>',
   }));
   await page.setContent(`
     <div id="cartModal"><h2>Added to cart</h2><button>Continue Shopping</button></div>
     <button id="next" onclick="this.textContent='Done'">Next</button>
-    <iframe title="Advertisement" src="https://googleads.g.doubleclick.net/test-overlay"
+    <iframe title="Advertisement" src="${adOverlayUrl}"
       style="position:fixed;inset:0;width:100%;height:100%;background:white"></iframe>
     <script>addEventListener('message', event => {
-      if (event.origin === 'https://googleads.g.doubleclick.net' && event.data === 'ad-dismissed')
+      if (event.origin === '${adOrigin}' && event.data === 'ad-dismissed')
         document.querySelector('iframe').remove();
     });</script>
   `);
@@ -23,9 +29,9 @@ test('ADS-01 closes the ad and keeps the cart confirmation open', async ({ page 
 });
 
 test('ADS-02 closes ad tabs and keeps application tabs open', async ({ page, context }) => {
-  await context.route('https://googleads.g.doubleclick.net/test-popup', route => route.fulfill({ body: 'Advertisement' }));
-  await context.route('https://automationexercise.com/test-popup', route => route.fulfill({ body: 'Application tab' }));
-  await page.setContent('<a href="https://googleads.g.doubleclick.net/test-popup" target="_blank">Ad</a><a href="https://automationexercise.com/test-popup" target="_blank">Application</a>');
+  await context.route(adPopupUrl, route => route.fulfill({ body: 'Advertisement' }));
+  await context.route(applicationUrl, route => route.fulfill({ body: 'Application tab' }));
+  await page.setContent(`<a href="${adPopupUrl}" target="_blank">Ad</a><a href="${applicationUrl}" target="_blank">Application</a>`);
   const adOpened = page.waitForEvent('popup');
   await page.getByRole('link', { name: 'Ad', exact: true }).click();
   const ad = await adOpened;

@@ -1,26 +1,70 @@
 import { test as base, expect } from '@playwright/test';
-import { newAccount, deleteAccount, type Account } from './accounts';
+import { newAccount, deleteAccount, verifyAccount, type Account } from './accounts';
 import { isAdUrl, handleAdOverlays, handleAdPopup } from './ads';
+import { settings } from './settings';
+import { SignupPage } from '../pages/signup-page';
+import { ProductsPage } from '../pages/products-page';
+import { ProductPage } from '../pages/product-page';
+import { CartPage } from '../pages/cart-page';
 
-export const test = base.extend<{ account: Account; adIsolation: void }>({
-  page: async ({ page }, use) => {
+type Fixtures = {
+  account: Account;
+  signup: SignupPage;
+  products: ProductsPage;
+  product: ProductPage;
+  cart: CartPage;
+  adIsolation: void;
+};
+
+export const test = base.extend<Fixtures>({
+  signup: async ({ page }, use) => { await use(new SignupPage(page)); },
+  products: async ({ page }, use) => { await use(new ProductsPage(page)); },
+  product: async ({ page }, use) => { await use(new ProductPage(page)); },
+  cart: async ({ page }, use) => { await use(new CartPage(page)); },
+  page: async ({ page }, use, testInfo) => {
+    const navigation: { path: string; status: number; responseStartMs: number }[] = [];
+    page.on('response', response => {
+      const request = response.request();
+      if (request.isNavigationRequest() && request.frame() === page.mainFrame()) {
+        navigation.push({
+          path: new URL(response.url()).pathname,
+          status: response.status(),
+          responseStartMs: request.timing().responseStart,
+        });
+      }
+    });
     await handleAdOverlays(page);
     page.on('popup', handleAdPopup);
-    await use(page);
-  },
-  account: async ({ request }, use) => {
-    const account = newAccount();
-    try { await use(account); }
-    finally { await deleteAccount(request, account); }
-  },
-  adIsolation: [async ({ context }, use) => {
-    if (process.env.BLOCK_ADS !== 'false') {
-      await context.route('**/*', async route => {
-        if (isAdUrl(route.request().url())) await route.abort();
-        else await route.continue();
+    try {
+      await use(page);
+    } finally {
+      await testInfo.attach('navigation-timing', {
+        body: JSON.stringify(navigation, null, 2),
+        contentType: 'application/json',
       });
     }
-    // An unexpected application dialog should fail the test.
+  },
+  account: [async ({ request }, use, testInfo) => {
+    const account = newAccount();
+    try {
+      await use(account);
+    } finally {
+      // Creation can succeed before a test fails, so always attempt cleanup.
+      await testInfo.attach('account-email', { body: account.email, contentType: 'text/plain' });
+      const deleted = await deleteAccount(request, account);
+      if (![200, 404].includes(deleted.responseCode)) {
+        throw new Error(`Cleanup failed for ${account.email}: ${deleted.message}`);
+      }
+      const verified = await verifyAccount(request, account);
+      if (verified.responseCode !== 404) {
+        throw new Error(`Cleanup could not confirm account absence: ${account.email}`);
+      }
+    }
+  }, { timeout: settings.cleanupTimeout }],
+  adIsolation: [async ({ context }, use) => {
+    if (settings.blockAds) {
+      await context.route('**/*', route => isAdUrl(route.request().url()) ? route.abort() : route.continue());
+    }
     context.on('page', page => page.on('dialog', async dialog => {
       const message = dialog.message();
       await dialog.dismiss();

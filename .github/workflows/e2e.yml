@@ -16,7 +16,8 @@ jobs:
     env:
       CI: 'true'
       BASE_URL: ${{ vars.BASE_URL || 'https://automationexercise.com' }}
-      WORKERS: '2'
+      WORKERS: ${{ vars.WORKERS || '2' }}
+      TEST_DATA_FILE: ${{ vars.TEST_DATA_FILE || 'config/test-data.json' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

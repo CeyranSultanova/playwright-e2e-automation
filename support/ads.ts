@@ -1,20 +1,10 @@
 import type { Frame, Page } from '@playwright/test';
-
-const adDomains = [
-  'doubleclick.net',
-  'googlesyndication.com',
-  'googleadservices.com',
-  'adservice.google.com',
-  'googletagservices.com',
-];
+import { settings } from './settings';
 
 export function isAdUrl(url: string): boolean {
-  try {
-    const { hostname } = new URL(url);
-    return adDomains.some(domain => hostname === domain || hostname.endsWith(`.${domain}`));
-  } catch {
-    return false;
-  }
+  if (!URL.canParse(url)) return false;
+  const { hostname } = new URL(url);
+  return settings.adDomains.some(domain => hostname === domain || hostname.endsWith(`.${domain}`));
 }
 
 function isAdFrame(frame: Frame): boolean {
@@ -27,15 +17,13 @@ function isAdFrame(frame: Frame): boolean {
 export async function handleAdOverlays(page: Page) {
   // Check before actions: ads can appear after navigation or a previous click.
   await page.addLocatorHandler(page.locator('body'), async () => {
-    for (const frame of page.frames()) {
-      if (frame === page.mainFrame() || !isAdFrame(frame)) continue;
+    for (const frame of page.frames().filter(isAdFrame)) {
       const close = frame.locator('#dismiss-button, [aria-label="Close ad"], [aria-label="Close Ad"]')
         .or(frame.getByRole('button', { name: /^(close|close ad|dismiss)$/i }));
-      for (const button of await close.all()) {
-        if (await button.isVisible()) {
-          await button.click({ timeout: 3_000 });
-          return;
-        }
+      const visibleClose = close.filter({ visible: true }).first();
+      if (await visibleClose.isVisible()) {
+        await visibleClose.click();
+        return;
       }
     }
   }, { noWaitAfter: true });

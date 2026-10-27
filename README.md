@@ -2,7 +2,7 @@
 
 Playwright and TypeScript tests for registration and product search on [Automation Exercise](https://automationexercise.com).
 
-The suite has 20 tests: 13 for registration, 5 for search and cart, and 2 for the ad handlers. The three smoke tests cover account creation, duplicate email rejection, and finding a product and adding it to the cart.
+The suite has 16 tests: 9 for registration, 5 for search and cart, and 2 for the ad handlers. The three smoke tests cover account creation, duplicate email rejection, and finding a product and adding it to the cart.
 
 ## Run locally
 
@@ -48,24 +48,24 @@ npx playwright install firefox
 BROWSERS=firefox npm test
 ```
 
-Chromium is the browser used for local verification and CI.
+Chromium is the browser used for local verification and CI. Test, assertion, action, navigation, API and cleanup timeouts are configurable through the `*_TIMEOUT_MS` variables in `.env.example`.
 
 ## How the suite is organised
 
 - `tests/` contains the scenarios and assertions. Case IDs link to [the test design](docs/test-design.md).
-- `pages/` contains repeated signup and search actions.
+- `pages/` contains locators and actions for signup, product search, product details and cart. Business assertions stay in the test files; a shared search assertion lives in `search.spec.ts`.
 - `support/` handles configuration, account setup/cleanup and ads.
 - `.github/workflows/e2e.yml` runs the suite in GitHub Actions.
 
 Locators use `data-qa` and accessible roles where possible. Product cards and cart rows need a few CSS selectors because the site has no test IDs for them. Playwright assertions wait for the expected UI state; `networkidle` is avoided because ad requests can keep the page busy.
 
-The eight required-field checks each clear one field from a valid form. Keeping them separate identifies the missing validation rule when a case fails. They check browser validity flags instead of translated validation messages.
+Four required-field checks cover credentials, identity, delivery and contact details: password, first name, address and mobile. Each clears one field from a valid form and checks browser validity flags. Other required fields remain in the manual design to limit repeated browser/API work on the shared site.
 
 ## Accounts and cleanup
 
-Each registration test gets a new address such as `ceyrantest+8a25d419b7e1429f@gmail.com`. The random suffix keeps parallel runs and retries independent. The successful registration uses the full UI; the duplicate-email test creates its starting account through the [public API](https://automationexercise.com/api_list).
+Each registration test generates a unique email, display name and password from the configured template. Emails use `ceyrantest+<UUID>@gmail.com`. Names include a short run suffix, and passwords include the full UUID. Country, date of birth and address values stay valid and configurable; catalogue expectations stay fixed so tests can detect unexpected product changes. The successful registration uses the full UI; the duplicate-email test creates its starting account through the [public API](https://automationexercise.com/api_list).
 
-Cleanup runs in `finally`: delete the account, then verify that its credentials no longer work. The helpers check both HTTP status and the API's JSON `responseCode`. A cleanup failure fails the test. Newsletter and partner-offer checkboxes stay unchecked.
+Cleanup runs in a test-scoped fixture with its own timeout: delete the account, then verify that its credentials no longer work. It also runs after assertion failures, and the report includes the owned email for recovery. HTTP/schema guards in API helpers and teardown checks throw errors when setup or cleanup cannot be trusted. Business response assertions stay in the tests. A cleanup failure fails the test. Newsletter and partner-offer checkboxes stay unchecked.
 
 The cart test removes its item at the end. Each browser context also has separate session cookies. Forced termination or an unavailable API can prevent cleanup; use the email in the failure trace to check the affected account.
 
@@ -79,21 +79,21 @@ To try the suite with real ads enabled:
 BLOCK_ADS=false npm run test:headed
 ```
 
-Close handlers stay active in this mode. They apply to the Playwright browser only. New ad providers or consent dialogs may need additional handling.
+Close handlers stay active in this mode. They apply to the Playwright browser only. New ad providers or consent dialogs may need additional handling. `AD_DOMAINS` controls the provider list. The ad-handler tests build controlled HTML pages directly; these are test harnesses, so they do not need application Page Objects.
 
 ## CI and reports
 
-GitHub Actions runs on pull requests, pushes to `main`, and manual dispatch. It installs dependencies and Chromium, checks TypeScript, and runs tests with two workers. Set the repository variable `BASE_URL` to change the target.
+GitHub Actions runs on pull requests, pushes to `main`, and manual dispatch. It installs dependencies and Chromium, checks TypeScript, and runs tests with two workers. Repository variables `BASE_URL`, `WORKERS` and `TEST_DATA_FILE` override the target, concurrency and data file.
 
 HTML and JUnit reports, plus failure traces, screenshots and videos, are uploaded as an artifact for seven days, including when tests fail. Locally, reports are in `playwright-report/` and `test-results/`. They can contain test credentials, so use test data only.
 
-CI allows one retry; local runs have none. A retry-pass needs investigation. Automatic cancellation of an active CI run is disabled to give account cleanup a chance to finish.
+Retries are disabled locally and in CI. Every failed attempt remains a failed run. Automatic cancellation of an active CI run is disabled to give account cleanup a chance to finish.
 
 ## Findings and limits
 
 - Search matches categories too: `top` returns some shirts. The partial-name test uses `blue` and checks every result name.
 - Empty search shows the full catalogue.
-- The public site has produced navigation and API timeouts. The latest full run had one navigation timeout; its isolated recheck passed. See [execution results](docs/validation.md).
+- The public site has produced navigation and API timeouts. Clicks that navigate now return without waiting for page loading; the next locator assertion checks readiness. Search waits for its query URL and DOM content to avoid reading results from the previous query. Each report includes main-frame response timing. See [execution results](docs/validation.md) for the investigation and latest run.
 - Product data belongs to the site and can change. Update expected values only after checking the change.
 - Other browsers and remote CI have not been verified. Mobile, accessibility, performance and security testing are outside this suite.
 

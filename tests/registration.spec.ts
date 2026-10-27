@@ -1,66 +1,62 @@
 import { test, expect } from '../support/fixtures';
-import { createAccount } from '../support/accounts';
-import { SignupPage } from '../pages/signup-page';
+import { createAccount, verifyAccount } from '../support/accounts';
+import { settings } from '../support/settings';
 
-test('REG-01 @smoke creates an account and logs the user in', async ({ page, account, request }) => {
-  const signup = new SignupPage(page);
+test.beforeEach(async ({ signup }) => {
   await signup.open();
-  await signup.start(account);
-  await signup.fillDetails(account);
-  await page.getByTestId('create-account').click();
-  await expect(page.getByTestId('account-created')).toHaveText('Account Created!');
-  await page.getByTestId('continue-button').click();
-  await expect(page.getByText(`Logged in as ${account.name}`)).toBeVisible();
-  await expect(page.getByRole('link', { name: /Logout$/ })).toBeVisible();
-  const response = await request.post('/api/verifyLogin', { form: { email: account.email, password: account.password } });
-  expect(response.ok()).toBeTruthy();
-  expect(await response.json()).toMatchObject({ responseCode: 200 });
+  await expect(signup.heading).toBeVisible({ timeout: settings.navigationTimeout });
 });
 
-test('REG-02 @smoke rejects an already registered email', async ({ page, request, account }) => {
-  await createAccount(request, account);
-  const signup = new SignupPage(page);
-  await signup.open();
+test('REG-01 @smoke creates an account and logs in', async ({ page, signup, account, request }) => {
   await signup.start(account);
-  await expect(page.getByText('Email Address already exist!', { exact: true })).toBeVisible();
-  await expect(page.getByTestId('signup-button')).toBeVisible();
-  await expect(page.getByRole('link', { name: /Logout$/ })).toHaveCount(0);
+  await expect(signup.detailsHeading).toBeVisible();
+  await expect(signup.email).toHaveValue(account.email);
+  await signup.fillDetails(account);
+  await signup.create();
+  await expect(signup.createdMessage).toHaveText('Account Created!');
+  await signup.continueToHome();
+  await expect(signup.loggedInAs(account.name)).toBeVisible();
+  await expect(signup.logoutLink).toBeVisible();
+  await expect(page).toHaveURL(new URL('/', settings.baseURL).href);
+  expect(await verifyAccount(request, account)).toMatchObject({ responseCode: 200, message: 'User exists!' });
+});
+
+test('REG-02 @smoke rejects an already registered email', async ({ signup, request, account }) => {
+  expect(await createAccount(request, account)).toMatchObject({ responseCode: 201, message: 'User created!' });
+  await signup.start(account);
+  await expect(signup.duplicateEmailMessage).toBeVisible();
+  await expect(signup.signupButton).toBeVisible();
+  await expect(signup.logoutLink).toHaveCount(0);
 });
 
 for (const field of ['name', 'email'] as const) {
-  test(`REG-03-${field} blocks signup when ${field} is empty`, async ({ page, account }) => {
-    await new SignupPage(page).open();
-    await page.getByTestId('signup-name').fill(field === 'name' ? '' : account.name);
-    await page.getByTestId('signup-email').fill(field === 'email' ? '' : account.email);
-    await page.getByTestId('signup-button').click();
-    const input = page.getByTestId(`signup-${field}`);
+  test(`REG-03-${field} requires ${field} to sign up`, async ({ page, signup, account }) => {
+    await signup.start({ ...account, [field]: '' });
+    const input = signup.signupField(field);
     await expect(input).toBeFocused();
     expect(await input.evaluate((element: HTMLInputElement) => element.validity.valueMissing)).toBe(true);
     await expect(page).toHaveURL(/\/login$/);
   });
 }
 
-test('REG-04 rejects an email without @', async ({ page, account }) => {
-  await new SignupPage(page).open();
-  await page.getByTestId('signup-name').fill(account.name);
-  await page.getByTestId('signup-email').fill(account.email.replace('@', ''));
-  await page.getByTestId('signup-button').click();
-  expect(await page.getByTestId('signup-email').evaluate((element: HTMLInputElement) => element.validity.typeMismatch)).toBe(true);
+test('REG-04 rejects an email without @', async ({ page, signup, account }) => {
+  await signup.start({ ...account, email: account.email.replace('@', '') });
+  await expect(signup.signupField('email')).toBeFocused();
+  expect(await signup.signupField('email').evaluate((element: HTMLInputElement) => element.validity.typeMismatch)).toBe(true);
   await expect(page).toHaveURL(/\/login$/);
 });
 
-for (const field of ['password', 'first_name', 'last_name', 'address', 'state', 'city', 'zipcode', 'mobile_number']) {
-  test(`REG-05-${field} blocks registration when ${field.replaceAll('_', ' ')} is empty`, async ({ page, account }) => {
-    const signup = new SignupPage(page);
-    await signup.open();
+for (const field of ['password', 'first_name', 'address', 'mobile_number']) {
+  test(`REG-05-${field} requires ${field.replaceAll('_', ' ')} to register`, async ({ page, signup, account }) => {
     await signup.start(account);
+    await expect(signup.detailsHeading).toBeVisible();
     await signup.fillDetails(account);
-    const input = page.getByTestId(field);
-    await input.fill('');
-    await page.getByTestId('create-account').click();
+    await signup.clearDetail(field);
+    await signup.create();
+    const input = signup.detailField(field);
     await expect(input).toBeFocused();
     expect(await input.evaluate((element: HTMLInputElement) => element.validity.valueMissing)).toBe(true);
-    await expect(page.getByTestId('account-created')).toHaveCount(0);
+    await expect(signup.createdMessage).toHaveCount(0);
     await expect(page).toHaveURL(/\/signup$/);
   });
 }

@@ -1,63 +1,68 @@
 import { randomUUID } from 'node:crypto';
 import { test, expect } from '../support/fixtures';
-import { ProductsPage } from '../pages/products-page';
+import type { ProductsPage } from '../pages/products-page';
 import { data } from '../support/settings';
 
-test('SEARCH-01 @smoke adds the searched product to the cart', async ({ page }) => {
-  const products = new ProductsPage(page);
-  const product = data.product;
+async function expectMatchingNames(products: ProductsPage, term: string) {
+  await expect(products.heading).toHaveText('Searched Products');
+  await expect(products.names.first()).toBeVisible();
+  const names = await products.names.allTextContents();
+  expect(names.length).toBeGreaterThan(0);
+  for (const name of names) expect(name.toLowerCase()).toContain(term.toLowerCase());
+}
+
+test.beforeEach(async ({ products }) => {
   await products.open();
-  await products.search(product.name);
-  await products.expectMatches(product.name);
-  const card = products.cards.filter({ has: page.locator('.productinfo p', { hasText: new RegExp(`^${product.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`) }) });
-  await expect(card).toHaveCount(1);
-  await card.getByRole('link', { name: 'View Product' }).click();
-  await expect(page).toHaveURL(new RegExp(`/product_details/${product.id}$`));
-  const details = page.locator('.product-information');
-  await expect(details.getByRole('heading', { name: product.name, exact: true })).toBeVisible();
-  await expect(details.locator('span > span')).toHaveText(product.price);
-  await expect(details.locator('p').filter({ hasText: 'Availability:' })).toHaveText(`Availability: ${product.availability}`);
-  await expect(page.locator('#quantity')).toHaveValue('1');
-  await page.locator('#quantity').fill(String(product.quantity));
-  await expect(page.locator('#quantity')).toHaveValue(String(product.quantity));
-  await details.getByRole('button', { name: 'Add to cart' }).click();
-  const modal = page.locator('#cartModal');
-  await expect(modal).toBeVisible();
-  await expect(modal.getByText('Your product has been added to cart.')).toBeVisible();
-  await modal.getByRole('link', { name: 'View Cart' }).click();
-  const row = page.locator(`#product-${product.id}`);
-  await expect(row.locator('.cart_description h4')).toHaveText(product.name);
-  await expect(row.locator('.cart_price')).toHaveText(product.price);
-  await expect(row.locator('.cart_quantity')).toHaveText(String(product.quantity));
-  await expect(row.locator('.cart_total_price')).toHaveText(`Rs. ${product.unitPrice * product.quantity}`);
-  await row.locator('.cart_quantity_delete').click();
-  await expect(row).toHaveCount(0);
-  await expect(page.getByText('Cart is empty!', { exact: false })).toBeVisible();
+  await expect(products.heading).toHaveText('All Products');
+  await expect(products.names.first()).toBeVisible();
 });
 
-test('SEARCH-02 allows a new search after no results', async ({ page }) => {
-  const products = new ProductsPage(page);
-  await products.open();
+test('SEARCH-01 @smoke adds the searched product to the cart', async ({ page, products, product, cart }) => {
+  const expected = data.product;
+  await products.search(expected.name);
+  await expectMatchingNames(products, expected.name);
+  await expect(products.card(expected.name)).toHaveCount(1);
+  await products.openProduct(expected.name);
+  await expect(product.name).toHaveText(expected.name);
+  await expect(page).toHaveURL(new RegExp(`/product_details/${expected.id}$`));
+  await expect(product.price).toHaveText(expected.price);
+  await expect(product.availability).toHaveText(`Availability: ${expected.availability}`);
+  await expect(product.quantity).toHaveValue('1');
+  await product.setQuantity(expected.quantity);
+  await expect(product.quantity).toHaveValue(String(expected.quantity));
+  await expect(product.addButton).toBeEnabled();
+  await product.addToCart();
+  await expect(product.confirmation).toBeVisible();
+  await expect(product.addedMessage).toBeVisible();
+  await product.viewCart();
+  await expect(cart.name(expected.id)).toHaveText(expected.name);
+  await expect(cart.price(expected.id)).toHaveText(expected.price);
+  await expect(cart.quantity(expected.id)).toHaveText(String(expected.quantity));
+  await expect(cart.total(expected.id)).toHaveText(`Rs. ${expected.unitPrice * expected.quantity}`);
+  await cart.remove(expected.id);
+  await expect(cart.row(expected.id)).toHaveCount(0);
+  await expect(cart.emptyMessage).toBeVisible();
+});
+
+test('SEARCH-02 can search again after no results', async ({ products }) => {
   await products.search(`no-product-${randomUUID()}`);
+  await expect(products.heading).toHaveText('Searched Products');
   await expect(products.cards).toHaveCount(0);
   await products.search(data.product.name);
-  await products.expectMatches(data.product.name);
+  await expectMatchingNames(products, data.product.name);
 });
 
 for (const [variant, term] of [['partial', data.product.partialTerm], ['uppercase', data.product.name.toUpperCase()]]) {
-  test(`SEARCH-03-${variant} matches ${variant} search terms`, async ({ page }) => {
-    const products = new ProductsPage(page);
-    await products.open();
+  test(`SEARCH-03-${variant} matches ${variant} search terms`, async ({ products }) => {
     await products.search(term);
-    await products.expectMatches(term);
-    await expect(products.cards.locator('.productinfo p').filter({ hasText: data.product.name })).toBeVisible();
+    await expectMatchingNames(products, term);
+    await expect(products.card(data.product.name)).toHaveCount(1);
   });
 }
 
-test('SEARCH-04 shows all products for an empty search', async ({ page }) => {
-  const products = new ProductsPage(page);
-  await products.open();
-  const initialNames = await products.cards.locator('.productinfo p').allTextContents();
+test('SEARCH-04 shows all products for an empty search', async ({ products }) => {
+  const initialNames = await products.names.allTextContents();
   await products.search('');
-  expect(await products.cards.locator('.productinfo p').allTextContents()).toEqual(initialNames);
+  await expect(products.heading).toHaveText('All Products');
+  await expect(products.names).toHaveText(initialNames);
 });

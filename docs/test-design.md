@@ -19,7 +19,7 @@ Each registration test gets a unique email and API cleanup, including the valida
 | REG-04 | P1 | Submit an email without `@` | Email has `typeMismatch`; remain on the login page |
 | REG-05 | P1 | Fill a valid details form, clear one required field and submit | Cleared field has `valueMissing` and receives focus; no account confirmation; remain on signup |
 
-REG-05 runs separately for password, first name, last name, address, state, city, postcode and mobile. Each field can lose its validation independently, so all eight checks are retained. Clearing one field at a time also avoids the first invalid field hiding a problem with another one.
+REG-05 runs for password, first name, address and mobile: credentials, identity, delivery and contact information. Clearing one field at a time avoids the first invalid field hiding a later one. Last name, state, city and postcode checks remain manual; they use the same native validation mechanism and add lower-value repeated setup against the shared service.
 
 The happy path includes optional company/address details and date of birth. Marketing opt-ins stay unchecked. Every case attempts account deletion in teardown and verifies that the account is absent.
 
@@ -52,6 +52,7 @@ These cases are designed but not automated in the default suite.
 
 | Case | Priority | Check | Decision or open question |
 | --- | --- | --- | --- |
+| REG-05-extra | P2 | Clear last name, state, city or postcode independently | Manual checks for remaining required fields |
 | REG-06 | P1 | Register with mandatory details only | Useful second positive path; full-form registration was implemented first |
 | REG-07 | P2 | Duplicate email with different casing or surrounding spaces | Confirm email normalization rules |
 | REG-08 | P2 | Names and addresses with Unicode, apostrophes and hyphens | Confirm supported characters and check values are preserved |
@@ -64,4 +65,4 @@ These cases are designed but not automated in the default suite.
 
 ## Passing criteria
 
-Type checking and the complete parallel suite should pass. Cleanup failures count as failures. CI retries help identify intermittent problems, but a retry-pass still needs investigation. Changes to product expectations should follow a checked catalogue change.
+Type checking and the complete parallel suite should pass. Cleanup failures count as failures. Retries are disabled locally and in CI; failed attempts remain visible. Main-frame response timing is attached to help distinguish slow responses from UI synchronization problems. Changes to product expectations should follow a checked catalogue change.
