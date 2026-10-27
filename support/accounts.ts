@@ -10,10 +10,11 @@ export function newAccount() {
 export async function createAccount(api: APIRequestContext, account: Account) {
   const response = await api.post('/api/createAccount', { form: account });
   expect(response.ok(), 'Create account HTTP status').toBeTruthy();
+  // The API reports application status in the response body too.
   expect(await response.json()).toMatchObject({ responseCode: 201, message: 'User created!' });
 }
 export async function deleteAccount(api: APIRequestContext, account: Account) {
-  // Always attempt deletion: UI/API creation can succeed before an assertion or navigation fails.
+  // Account creation may succeed even if the next UI step fails.
   const response = await api.delete('/api/deleteAccount', { form: { email: account.email, password: account.password } });
   expect(response.ok(), 'Cleanup HTTP status').toBeTruthy();
   const result = await response.json();

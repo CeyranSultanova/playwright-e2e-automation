@@ -1,12 +1,12 @@
-# Automation Exercise end-to-end suite
+# Automation Exercise tests
 
-Playwright + TypeScript tests for account registration and product discovery on [Automation Exercise](https://automationexercise.com). The suite prioritizes complete customer outcomes: an authenticated new account and the intended product added to a cart with the correct quantity and total.
+Playwright and TypeScript tests for registration and product search on [Automation Exercise](https://automationexercise.com).
 
-There are 20 independent tests: 13 registration cases, 5 search/cart cases and 2 controlled browser checks for ad handling. The original, prioritized case designs and deferred scenarios are in [docs/test-design.md](docs/test-design.md).
+The suite has 20 tests: 13 for registration, 5 for search and cart, and 2 for the ad handlers. The three smoke tests cover account creation, duplicate email rejection, and finding a product and adding it to the cart.
 
-## Install and run
+## Run locally
 
-Use Node.js 22 or newer and npm. From the repository root:
+Use Node.js 22 or newer.
 
 ```sh
 npm ci
@@ -15,103 +15,86 @@ npm run typecheck
 npm test
 ```
 
-`npm test` runs the complete suite in parallel with two workers and no local retries. Run separate Playwright commands sequentially in this checkout because they share report and artifact directories. No manually registered account or test ordering is needed. A typical run performs real writes on the configured application; use a target you are authorized to test.
+Tests run with two workers. Each test has its own browser context and data, so no account setup or test ordering is needed.
 
 ```sh
-npm run test:smoke       # Three business-critical journeys
-npm run test:headed      # Visible browser
-npm run test:ui          # Interactive runner
-npm run report          # Open the last HTML report
-npm test -- --grep REG-02
+npm run test:headed       # Watch the browser
+npm run test:smoke        # Run the three main journeys
+npm run test:ui           # Open the interactive runner
+npm run report           # Open the HTML report
+npm test -- --grep REG-02 # Run one case
 ```
+
+Run these commands one at a time in the same checkout; separate runs share the report folders.
 
 ## Configuration
 
-Copy `.env.example` to `.env` when overrides are needed. Environment variables take precedence over `.env`.
+Copy `.env.example` to `.env` to change the defaults. Environment variables override `.env`.
 
-| Setting | Default | Purpose |
+| Variable | Default | Use |
 | --- | --- | --- |
-| `BASE_URL` | `https://automationexercise.com` | UI and API target, with compatible routes and catalogue |
-| `TEST_DATA_FILE` | `config/test-data.json` | Complete JSON fixture file, relative to repository root or absolute |
-| `WORKERS` | `2` | Positive integer; keep low to respect the shared public service |
-| `BROWSERS` | `chromium` | Comma-separated selection of `chromium,firefox,webkit` |
-| `BLOCK_ADS` | `true` | Set `false` to diagnose behavior with real advertising |
+| `BASE_URL` | `https://automationexercise.com` | Target for UI and API requests |
+| `TEST_DATA_FILE` | `config/test-data.json` | JSON file containing user and product data |
+| `WORKERS` | `2` | Number of parallel workers |
+| `BROWSERS` | `chromium` | Comma-separated browser names |
+| `BLOCK_ADS` | `true` | Set to `false` to load real ads |
 
-Names, addresses, password, email prefix/domain, date of birth, search terms, product ID, expected price/availability and cart quantity are configurable without changing test code. A replacement JSON file should preserve the supplied schema. Use a supported title/country and date; the product quantity must be an integer greater than one to exercise quantity changes. Configuration fails early for missing user fields or invalid core product values. Keep the displayed price and numeric unit price consistent.
+Edit [config/test-data.json](config/test-data.json) to change the name, address, email prefix/domain, password or product expectations. A replacement file must use the same structure. The target must have compatible UI/API routes and the configured product. Keep `price` and `unitPrice` consistent, and use a quantity greater than one.
+
+For another browser, install it first, then select it:
 
 ```sh
-BASE_URL=https://automationexercise.com WORKERS=2 npm test
-TEST_DATA_FILE=config/test-data.json npm run test:smoke
-npx playwright install firefox webkit
-BROWSERS=chromium,firefox,webkit npm test
+npx playwright install firefox
+BROWSERS=firefox npm test
 ```
 
-Only Chromium is the default acceptance gate. Additional browsers are optional and should be validated before promoting them to release gates.
+Chromium is the browser used for local verification and CI.
 
-## Structure and technical choices
+## How the suite is organised
 
-```text
-config/test-data.json        Editable synthetic user and catalogue expectations
-pages/                      Small page objects for shared signup/search actions
-support/accounts.ts         Unique identities and verified API lifecycle
-support/fixtures.ts         Per-test ownership and advertisement isolation
-support/ads.ts              Ad frame dismissal and ad-tab handling
-support/settings.ts         Environment and fixture loading
-tests/                     Business assertions and parameterized validation cases
-docs/test-design.md        Priorities, cases, expected outcomes and exclusions
-.github/workflows/e2e.yml    CI run and report artifacts
+- `tests/` contains the scenarios and assertions. Case IDs link to [the test design](docs/test-design.md).
+- `pages/` contains repeated signup and search actions.
+- `support/` handles configuration, account setup/cleanup and ads.
+- `.github/workflows/e2e.yml` runs the suite in GitHub Actions.
+
+Locators use `data-qa` and accessible roles where possible. Product cards and cart rows need a few CSS selectors because the site has no test IDs for them. Playwright assertions wait for the expected UI state; `networkidle` is avoided because ad requests can keep the page busy.
+
+The eight required-field checks each clear one field from a valid form. Keeping them separate identifies the missing validation rule when a case fails. They check browser validity flags instead of translated validation messages.
+
+## Accounts and cleanup
+
+Each registration test gets a new address such as `ceyrantest+8a25d419b7e1429f@gmail.com`. The random suffix keeps parallel runs and retries independent. The successful registration uses the full UI; the duplicate-email test creates its starting account through the [public API](https://automationexercise.com/api_list).
+
+Cleanup runs in `finally`: delete the account, then verify that its credentials no longer work. The helpers check both HTTP status and the API's JSON `responseCode`. A cleanup failure fails the test. Newsletter and partner-offer checkboxes stay unchecked.
+
+The cart test removes its item at the end. Each browser context also has separate session cookies. Forced termination or an unavailable API can prevent cleanup; use the email in the failure trace to check the affected account.
+
+## Ads and pop-ups
+
+Known advertising domains are blocked before navigation. If an ad loads, the handler clicks its close control inside a recognized ad frame. It also closes tabs that navigate to known ad domains. The cart confirmation and application tabs remain available; two controlled tests check this behavior.
+
+To try the suite with real ads enabled:
+
+```sh
+BLOCK_ADS=false npm run test:headed
 ```
 
-Page objects encapsulate repeated UI operations; business assertions stay visible in tests. There is no generic base page, arbitrary sleep, forced click or dependency between tests. Locators use the site's `data-qa` attributes and accessible roles where available. Narrow CSS selectors are used for product cards, prices, cart rows and unlabeled controls that lack test IDs. Auto-waiting locators and web-first assertions synchronize against observable UI state. Navigation avoids `networkidle`, which is inappropriate for ad-heavy pages.
-
-The mandatory-field matrix clears one field at a time from a valid form, so each test checks its own failure cause. Native `ValidityState` checks avoid language-dependent browser validation messages.
-
-## Data ownership and cleanup
-
-Each registration test uses a unique plus-address alias of `ceyrantest@gmail.com`, for example `ceyrantest+8a25d419b7e1429f@gmail.com`. The suffix uses 16 random UUID hex characters and is regenerated for every retry and browser project. Set `user.emailPrefix` and `user.emailDomain` in the JSON fixture to change the base address. Duplicate-email setup uses the public API, while the successful registration journey uses the full UI. Credentials in the checked-in fixture are synthetic and must never be reused for real accounts.
-
-Fixture teardown runs in `finally`, even if setup or a UI assertion fails after an account was created. It attempts API deletion for its own email, accepts only deletion/not-found application response codes, then calls verify-login and requires not-found. Both HTTP success and the API's JSON `responseCode` are checked because this service reports application status inside the response body. Cleanup errors remain test failures; they are not swallowed.
-
-Product tests share only immutable catalogue expectations. Browser contexts and cookies are isolated per test. The cart case removes its item explicitly; context disposal abandons the anonymous session if an earlier step fails. No shared login state or persistent account is used.
-
-A killed process, machine loss or unavailable deletion endpoint can prevent teardown. This third-party demo has no account-inventory API suitable for a safe global janitor. Failure traces can help identify the owned test email for manual deletion through the [public API](https://automationexercise.com/api_list); never delete accounts outside the run's ownership.
-
-## Ads, pop-ups and reliability
-
-An automatic fixture installs context-wide routing before any test page navigates. It blocks requests to a small explicit set of known advertising domains and their subdomains: DoubleClick, Google syndication, ad services and tag services. This prevents their overlays and click-triggered ad windows at their source. First-party application, cart and account requests remain real. Service workers are disabled so they cannot bypass routing.
-
-If an ad still loads, a locator handler checks recognized advertising frames before UI actions and clicks their Close ad / dismissal control. This covers the Google vignette observed during live inspection. New tabs navigating to the listed ad domains are closed; application tabs remain open. The two controlled browser checks verify ad dismissal while preserving the cart confirmation and application tabs. They use local responses for ad URLs so the checks do not depend on ad delivery.
-
-The suite does not hide arbitrary overlays, remove application DOM elements, blanket-block third parties or force clicks through obstructions. Unexpected JavaScript dialogs are dismissed and reported as errors. New ad providers or regional consent overlays may require an explicit reviewed handler. `BLOCK_ADS=false npm run test:headed` allows real ads to load while keeping the close handlers active. These handlers apply inside Playwright sessions; they do not change your normal browser settings. Blocking ads changes the page's integration environment and disables browser cache through request routing; this suite is not an advertising, consent or performance acceptance test.
+Close handlers stay active in this mode. They apply to the Playwright browser only. New ad providers or consent dialogs may need additional handling.
 
 ## CI and reports
 
-GitHub Actions runs on main-branch pushes, pull requests and manual dispatch. It installs the lockfile dependencies and Chromium, checks TypeScript, then runs the suite with two workers. Set repository variable `BASE_URL` to use another compatible environment. Concurrent runs are not cancelled automatically, reducing the chance of abandoning accounts during teardown.
+GitHub Actions runs on pull requests, pushes to `main`, and manual dispatch. It installs dependencies and Chromium, checks TypeScript, and runs tests with two workers. Set the repository variable `BASE_URL` to change the target.
 
-The final `always()` step publishes downloadable HTML, JUnit and failure diagnostics as an Actions artifact retained for seven days. Download the artifact and open the HTML report with Playwright. This publishes a report artifact, not a public GitHub Pages website. Traces, screenshots and videos are retained for failed attempts. Reports can include synthetic credentials and address values; restrict artifact access and do not substitute real customer data.
+HTML and JUnit reports, plus failure traces, screenshots and videos, are uploaded as an artifact for seven days, including when tests fail. Locally, reports are in `playwright-report/` and `test-results/`. They can contain test credentials, so use test data only.
 
-CI permits one retry to collect evidence of transient failures. Investigate any flaky classification. There are no retries around account creation that could conceal duplicate side effects, and no silently skipped assertions.
+CI allows one retry; local runs have none. A retry-pass needs investigation. Automatic cancellation of an active CI run is disabled to give account cleanup a chance to finish.
 
-## Known limitations and validation evidence
+## Findings and limits
 
-The external site's availability, catalogue changes, network restrictions and rate limits can affect results. The suite cannot seed products; configure an existing known product for another environment. Empty-query behavior is a characterization of the current site. Search also matches categories: `top` includes shirts in the `Tops & Shirts` category. The partial-name case deliberately uses `blue` to test name matching across multiple products; category search needs its own metadata-aware oracle. Whitespace normalization, password policy and invalid cart quantities are explicitly designed but deferred in the test design rather than assigned invented requirements.
+- Search matches categories too: `top` returns some shirts. The partial-name test uses `blue` and checks every result name.
+- Empty search shows the full catalogue.
+- The public site has produced navigation and API timeouts. The latest full run had one navigation timeout; its isolated recheck passed. See [execution results](docs/validation.md).
+- Product data belongs to the site and can change. Update expected values only after checking the change.
+- Other browsers and remote CI have not been verified. Mobile, accessibility, performance and security testing are outside this suite.
 
-See [docs/validation.md](docs/validation.md) for the actual local execution results. CI configuration is supplied, but a remote CI run requires publishing this repository. Cross-browser, mobile, accessibility, security, performance and advertising behavior are outside the default acceptance scope.
-
-## Publishing the repository
-
-Create an empty repository on your chosen host, then run:
-
-```sh
-git init -b main
-git add .
-git commit -m "Add independent Playwright registration and search suite"
-git remote add origin <your-repository-url>
-git push -u origin main
-```
-
-Keep `.env`, generated reports and dependencies excluded via `.gitignore`. Share the resulting repository URL as the submission. Hosting requires your repository destination and authenticated access; a local implementation is not itself a hosted deliverable.
-
-## References
-
-The implementation uses the site's [documented account API](https://automationexercise.com/api_list) for lifecycle operations and Playwright's [test-scoped fixtures](https://playwright.dev/docs/test-fixtures) for ownership and teardown. The test designs are specific to the requested risks and were not copied from the site's published test cases.
+Further cases and their priorities are listed in [docs/test-design.md](docs/test-design.md). Publishing requires a hosted repository; the workflow has not yet been run on GitHub.

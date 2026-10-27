@@ -3,7 +3,7 @@ import { test, expect } from '../support/fixtures';
 import { ProductsPage } from '../pages/products-page';
 import { data } from '../support/settings';
 
-test('SEARCH-01 @smoke finds a product, verifies details and adds the selected quantity to cart', async ({ page }) => {
+test('SEARCH-01 @smoke adds the searched product to the cart', async ({ page }) => {
   const products = new ProductsPage(page);
   const product = data.product;
   await products.open();
@@ -35,7 +35,7 @@ test('SEARCH-01 @smoke finds a product, verifies details and adds the selected q
   await expect(page.getByText('Cart is empty!', { exact: false })).toBeVisible();
 });
 
-test('SEARCH-02 shows no product cards for a unique unmatched query and can recover', async ({ page }) => {
+test('SEARCH-02 allows a new search after no results', async ({ page }) => {
   const products = new ProductsPage(page);
   await products.open();
   await products.search(`no-product-${randomUUID()}`);
@@ -45,7 +45,7 @@ test('SEARCH-02 shows no product cards for a unique unmatched query and can reco
 });
 
 for (const [variant, term] of [['partial', data.product.partialTerm], ['uppercase', data.product.name.toUpperCase()]]) {
-  test(`SEARCH-03-${variant} returns only relevant products`, async ({ page }) => {
+  test(`SEARCH-03-${variant} matches ${variant} search terms`, async ({ page }) => {
     const products = new ProductsPage(page);
     await products.open();
     await products.search(term);
@@ -54,7 +54,7 @@ for (const [variant, term] of [['partial', data.product.partialTerm], ['uppercas
   });
 }
 
-test('SEARCH-04 an empty query preserves the complete product catalogue', async ({ page }) => {
+test('SEARCH-04 shows all products for an empty search', async ({ page }) => {
   const products = new ProductsPage(page);
   await products.open();
   const initialNames = await products.cards.locator('.productinfo p').allTextContents();

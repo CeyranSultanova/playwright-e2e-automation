@@ -1,61 +1,67 @@
-# Risk-based test design
+# Test design
 
-These cases were designed from the requested user journeys and observed UI behavior, independently of the site's published test-case list.
+The main risks are a customer being unable to register, getting misleading search results, or adding the wrong product or quantity to the cart. The cases below follow those journeys and the site's observed behavior.
 
-## Scope and priorities
+- **P0:** Main journeys; included in `npm run test:smoke`.
+- **P1:** Common errors and validation; included in the full suite where automated.
+- **P2:** Additional edge cases or behavior that needs a requirement clarified.
 
-P0 protects the two primary customer outcomes: creating an authenticated account and finding/purchasing the intended item. P1 protects common mistakes and search recovery. P2 cases remain exploratory because their expected behavior requires a product decision, or their value is lower than the core paths. The public site is a shared external dependency: tests own accounts and browser sessions, but cannot provision its product catalogue.
+Each registration test gets a unique email and API cleanup, including the validation tests. Search tests use the shared catalogue and separate browser sessions. Case IDs match the test names; parameterized cases add a field or query variant to the ID.
 
-Every automated test gets a fresh browser context. Every registration test, including validation cases, gets a unique plus-address email and a teardown that attempts deletion and confirms login no longer works. Product tests use the existing read-only catalogue; each cart is isolated by its anonymous session. The cart journey explicitly removes its item; context disposal also discards the anonymous session on failure.
+## Registration
 
-## Automated registration cases
+| Case | Priority | Steps | Expected result |
+| --- | --- | --- | --- |
+| REG-01 | P0 | Open Signup / Login from home, enter a new name/email, complete all account details, create the account and continue | Account Created confirmation, correct logged-in name and Logout link; API accepts the credentials |
+| REG-02 | P0 | Create an account through the API, then try signing up with its email | Duplicate-email error; signup stays available and the user is not logged in |
+| REG-03-name | P1 | Fill email, leave name empty and submit | Name has `valueMissing`, receives focus, and signup does not advance |
+| REG-03-email | P1 | Fill name, leave email empty and submit | Email has `valueMissing`, receives focus, and signup does not advance |
+| REG-04 | P1 | Submit an email without `@` | Email has `typeMismatch`; remain on the login page |
+| REG-05 | P1 | Fill a valid details form, clear one required field and submit | Cleared field has `valueMissing` and receives focus; no account confirmation; remain on signup |
 
-| ID / priority | Preconditions and actions | Expected result |
+REG-05 runs separately for password, first name, last name, address, state, city, postcode and mobile. Each field can lose its validation independently, so all eight checks are retained. Clearing one field at a time also avoids the first invalid field hiding a problem with another one.
+
+The happy path includes optional company/address details and date of birth. Marketing opt-ins stay unchecked. Every case attempts account deletion in teardown and verifies that the account is absent.
+
+## Search and cart
+
+| Case | Priority | Steps | Expected result |
+| --- | --- | --- | --- |
+| SEARCH-01 | P0 | Search for the configured product, open its result, change quantity, add it and open the cart | Every result name matches; correct detail URL, name, price and availability; quantity starts at 1 and can be changed; cart shows the selected product, price, quantity and calculated total |
+| SEARCH-02 | P1 | Search for a unique nonexistent term, then search for the known product | Zero product cards for the first query; matching results for the second |
+| SEARCH-03-partial | P1 | Search for the configured partial name, currently `blue` | Nonempty results; every name contains the term; the known product is present |
+| SEARCH-03-uppercase | P1 | Search for the known name in uppercase | Matching results include the known product |
+| SEARCH-04 | P1 | Record the catalogue, then submit an empty query | All Products heading and the same ordered product names |
+
+SEARCH-01 removes its cart item and checks the empty cart. Product expectations come from the JSON fixture. The empty-query case compares against the catalogue loaded before searching.
+
+The `top` query also matches categories: Little Girls Mr. Panda Shirt belongs to Tops & Shirts. A category-search test would need to check that metadata. Requiring every result name to contain `top` would be an incorrect expectation.
+
+## Ad handlers
+
+These checks use controlled responses because live ads do not appear consistently.
+
+| Case | Steps | Expected result |
 | --- | --- | --- |
-| REG-01 / P0 | Fresh identity; open home → Signup / Login; submit name/email; complete title, date of birth, password and address details; create account; continue | Creation confirmation; correct logged-in name and Logout link; API confirms credentials work. Teardown deletes and verifies absence. |
-| REG-02 / P0 | Create a unique account through API; submit its email through signup | Exact duplicate-email error; signup remains available; no authenticated Logout link. Original fixture account is deleted. |
-| REG-03-name / P1 | Fill email, leave name empty; submit | Native `valueMissing`; focus on name; remain on login page. |
-| REG-03-email / P1 | Fill name, leave email empty; submit | Native `valueMissing`; focus on email; remain on login page. |
-| REG-04 / P1 | Submit a unique malformed address without `@` | Native `typeMismatch`; remain on login page. Locale-dependent browser tooltip text is not asserted. |
-| REG-05 / P1 | Start with a complete valid details form; independently clear password, first name, last name, address, state, city, postcode or mobile; submit | Eight isolated cases: missing field focused, native `valueMissing`, no creation confirmation, remain on signup page. |
+| ADS-01 | Show a Google ad iframe over a page that also contains a cart confirmation; try a page action | Ad closes, action completes, cart confirmation stays visible |
+| ADS-02 | Open an advertising tab and an application tab | Ad tab closes; application tab remains usable |
 
-The valid form deliberately leaves newsletter/partner marketing opt-ins unchecked. Tests must not subscribe test addresses to communications. Company and second address are populated in the happy path but are not treated as required.
+## Further coverage
 
-## Automated search cases
+These cases are designed but not automated in the default suite.
 
-| ID / priority | Preconditions and actions | Expected result |
-| --- | --- | --- |
-| SEARCH-01 / P0 | Open Products; search configured exact name; inspect every result; open exact matching card; change quantity; Add to cart; View Cart | Every result name contains query; correct detail URL/name/price/availability; quantity initially 1 and editable; visible add confirmation; cart has correct product, unit price, quantity and calculated total; remove item and verify empty cart. |
-| SEARCH-02 / P1 | Search UUID-based nonexistent term, then a known product in the same session | Searched Products heading, zero cards; subsequent valid search recovers and shows matching results. |
-| SEARCH-03-partial / P1 | Search configured partial name term (`blue`) | Nonempty results; every product name matches case-insensitively; configured known product is present. |
-| SEARCH-03-uppercase / P1 | Search uppercased known name | Nonempty relevant results and known product present. |
-| SEARCH-04 / P1 | Capture catalogue names; submit an empty query | The All Products heading and the same ordered catalogue remain available. This is the site's current behavior, not a proposed requirement. |
+| Case | Priority | Check | Decision or open question |
+| --- | --- | --- | --- |
+| REG-06 | P1 | Register with mandatory details only | Useful second positive path; full-form registration was implemented first |
+| REG-07 | P2 | Duplicate email with different casing or surrounding spaces | Confirm email normalization rules |
+| REG-08 | P2 | Names and addresses with Unicode, apostrophes and hyphens | Confirm supported characters and check values are preserved |
+| REG-09 | P2 | Password length boundaries and weak passwords | Needs a defined password policy |
+| REG-10 | P2 | Refresh, back navigation or double-submit during creation | Check that only one account is created; investigate in a controlled environment |
+| SEARCH-05 | P2 | Query with leading/trailing spaces | Confirm whether trimming is required |
+| SEARCH-06 | P2 | Punctuation, Unicode and long search queries | Check error handling and rendering; clarify length limits |
+| CART-02 | P1 | Zero, negative, decimal or nonnumeric quantity | Check invalid quantities cannot be added; `min=1` alone does not prove the JavaScript button enforces it |
+| RES-01 | P2 | Failed requests and slow connections | Check error messages and recovery in a controlled environment |
 
-## Additional designed cases and decisions
+## Passing criteria
 
-| ID / priority | Test design | Expected result / reason not in the default suite |
-| --- | --- | --- |
-| REG-06 / P1 | Complete only mandatory account details, leaving DOB/title/company/address2 empty | Account created and authenticated; useful additional positive path, deferred behind full-form coverage. |
-| REG-07 / P2 | Retry the duplicate email with case variations and surrounding whitespace | Product owner must specify email normalization policy before asserting a contract. |
-| REG-08 / P2 | Unicode/apostrophes/hyphens in names and address | Values preserved and safely displayed; requires agreed supported-character policy. |
-| REG-09 / P2 | Password length boundaries and weak passwords | Requires an explicit password policy; do not invent acceptance rules from assumptions. |
-| REG-10 / P2 | Refresh/back/double-submit during creation | At most one account; useful race exploration, but destructive timing tests are unsuitable for routine load on a shared demo. |
-| SEARCH-05 / P2 | Surround query with spaces | Decide whether trimming is required; assess observed behavior before making a gate. |
-| SEARCH-06 / P2 | Query punctuation, Unicode, and a very long string | No server error or unsafe rendering; clarify matching and length requirements. |
-| CART-02 / P1 | Enter zero, negative, decimal and nonnumeric quantity; click Add to cart | Invalid quantities must not be added. Native `min=1` alone does not guarantee the JavaScript button enforces it; retain as focused exploratory validation. |
-| RES-01 / P2 | Fail product/account requests or simulate poor connectivity in a controlled environment | Useful actionable error and recovery; fault injection deferred because this suite validates the real third-party service. |
-
-## Oracles and exit criteria
-
-Product expectations come from versioned, configurable fixture data, not a live API that could repeat the same application bug. Empty search compares against the catalogue observed before submission. Search relevance is checked for every card, avoiding the false confidence of checking only the first result. The known exact product must be unique.
-
-Release evidence requires type checking and a complete parallel run without failures. CI retries once for diagnostics, but a retry-pass is still a flaky result requiring investigation; it is not equivalent to a clean first-pass run. Cleanup failures fail the test. Changes to catalogue data should be reviewed and applied to configuration, not hidden by weakened assertions.
-
-Live discovery: `top` also matches category metadata, including Little Girls Mr. Panda Shirt in Tops & Shirts. The partial-name case uses `blue` to exercise multiple name matches. A future category-search case should validate category metadata rather than incorrectly require every displayed name to include the term.
-
-## Ad-handling checks
-
-- ADS-01: Serve a controlled Google ad iframe with a close control. A blocked page action resumes after dismissal, while the cart confirmation remains visible.
-- ADS-02: Open a known advertising tab and an application tab. The advertising tab closes; the application tab remains usable.
-
-These two checks use controlled responses. They verify the handler boundaries separately from the 18 live end-to-end cases.
+Type checking and the complete parallel suite should pass. Cleanup failures count as failures. CI retries help identify intermittent problems, but a retry-pass still needs investigation. Changes to product expectations should follow a checked catalogue change.

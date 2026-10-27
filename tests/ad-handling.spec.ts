@@ -1,7 +1,7 @@
 import { test, expect } from '../support/fixtures';
 
-// Controlled ad responses exercise dismissal even when the live ad service serves nothing.
-test('ADS-01 closes an ad overlay without closing the cart confirmation', async ({ page }) => {
+// Serve the ad locally so these checks do not depend on live ad delivery.
+test('ADS-01 closes the ad and keeps the cart confirmation open', async ({ page }) => {
   await page.route('https://googleads.g.doubleclick.net/test-overlay', route => route.fulfill({
     contentType: 'text/html',
     body: '<button id="dismiss-button" onclick="parent.postMessage(\'ad-dismissed\', \'*\')">Close ad</button>',
@@ -22,7 +22,7 @@ test('ADS-01 closes an ad overlay without closing the cart confirmation', async 
   await expect(page.locator('#cartModal')).toBeVisible();
 });
 
-test('ADS-02 closes ad tabs and preserves application tabs', async ({ page, context }) => {
+test('ADS-02 closes ad tabs and keeps application tabs open', async ({ page, context }) => {
   await context.route('https://googleads.g.doubleclick.net/test-popup', route => route.fulfill({ body: 'Advertisement' }));
   await context.route('https://automationexercise.com/test-popup', route => route.fulfill({ body: 'Application tab' }));
   await page.setContent('<a href="https://googleads.g.doubleclick.net/test-popup" target="_blank">Ad</a><a href="https://automationexercise.com/test-popup" target="_blank">Application</a>');

@@ -2,7 +2,7 @@ import { test, expect } from '../support/fixtures';
 import { createAccount } from '../support/accounts';
 import { SignupPage } from '../pages/signup-page';
 
-test('REG-01 @smoke registers through the full form and starts an authenticated session', async ({ page, account, request }) => {
+test('REG-01 @smoke creates an account and logs the user in', async ({ page, account, request }) => {
   const signup = new SignupPage(page);
   await signup.open();
   await signup.start(account);
@@ -17,7 +17,7 @@ test('REG-01 @smoke registers through the full form and starts an authenticated 
   expect(await response.json()).toMatchObject({ responseCode: 200 });
 });
 
-test('REG-02 @smoke rejects an email belonging to an existing account', async ({ page, request, account }) => {
+test('REG-02 @smoke rejects an already registered email', async ({ page, request, account }) => {
   await createAccount(request, account);
   const signup = new SignupPage(page);
   await signup.open();
@@ -28,7 +28,7 @@ test('REG-02 @smoke rejects an email belonging to an existing account', async ({
 });
 
 for (const field of ['name', 'email'] as const) {
-  test(`REG-03-${field} requires signup ${field}`, async ({ page, account }) => {
+  test(`REG-03-${field} blocks signup when ${field} is empty`, async ({ page, account }) => {
     await new SignupPage(page).open();
     await page.getByTestId('signup-name').fill(field === 'name' ? '' : account.name);
     await page.getByTestId('signup-email').fill(field === 'email' ? '' : account.email);
@@ -40,7 +40,7 @@ for (const field of ['name', 'email'] as const) {
   });
 }
 
-test('REG-04 rejects a malformed email using native validation', async ({ page, account }) => {
+test('REG-04 rejects an email without @', async ({ page, account }) => {
   await new SignupPage(page).open();
   await page.getByTestId('signup-name').fill(account.name);
   await page.getByTestId('signup-email').fill(account.email.replace('@', ''));
@@ -50,7 +50,7 @@ test('REG-04 rejects a malformed email using native validation', async ({ page, 
 });
 
 for (const field of ['password', 'first_name', 'last_name', 'address', 'state', 'city', 'zipcode', 'mobile_number']) {
-  test(`REG-05-${field} prevents account creation without ${field}`, async ({ page, account }) => {
+  test(`REG-05-${field} blocks registration when ${field.replaceAll('_', ' ')} is empty`, async ({ page, account }) => {
     const signup = new SignupPage(page);
     await signup.open();
     await signup.start(account);

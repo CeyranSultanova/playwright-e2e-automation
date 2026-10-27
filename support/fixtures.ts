@@ -20,7 +20,7 @@ export const test = base.extend<{ account: Account; adIsolation: void }>({
         else await route.continue();
       });
     }
-    // Unexpected JS dialogs fail the test; they are not silently accepted.
+    // An unexpected application dialog should fail the test.
     context.on('page', page => page.on('dialog', async dialog => {
       const message = dialog.message();
       await dialog.dismiss();
