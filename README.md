@@ -135,6 +135,6 @@ Retries are disabled locally and in CI. Every failed attempt remains a failed ru
 - Empty search shows the full catalogue.
 - The public site has produced navigation/API timeouts and HTTP 503 overload responses. Navigation clicks return without waiting for page loading; the next locator assertion checks readiness. Search waits for its query URL and DOM content to avoid reading previous results. Main-frame response timing is attached for diagnosis. See [execution results](docs/validation.md) for actual outcomes.
 - Product data belongs to the site and can change. Update expected values only after checking the change.
-- Other browsers and remote CI have not been verified. Mobile, accessibility, performance and security testing are outside this suite.
+- Other browsers have not been verified. GitHub Actions has been executed successfully.
 
-Further cases and their priorities are listed in [docs/test-design.md](docs/test-design.md). Publishing requires a hosted repository; the workflow has not yet been run on GitHub.
+Further cases and their priorities are listed in [docs/test-design.md](docs/test-design.md). Publishing requires a hosted repository; The project is hosted on GitHub, and the CI workflow has been successfully executed. HTML and JUnit reports are available as workflow artifacts.
