@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { test, expect } from '../support/fixtures';
 import type { ProductsPage } from '../pages/products-page';
-import { data } from '../support/settings';
+import { data, settings } from '../support/settings';
 
 async function expectMatchingNames(products: ProductsPage, term: string) {
   await expect(products.heading).toHaveText('Searched Products');
@@ -9,7 +9,7 @@ async function expectMatchingNames(products: ProductsPage, term: string) {
     const names = await products.names.allTextContents();
     expect(names.length).toBeGreaterThan(0);
     for (const name of names) expect(name.toLowerCase()).toContain(term.toLowerCase());
-  }).toPass();
+  }).toPass({ timeout: settings.expectTimeout });
 }
 
 test.beforeEach(async ({ products }) => {

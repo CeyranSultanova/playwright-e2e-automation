@@ -21,7 +21,7 @@ Each registration test gets a unique email. Tests that create an account mark it
 
 REG-05 runs for password, first name, address and mobile: credentials, identity, delivery and contact information. Clearing one field at a time avoids the first invalid field hiding a later one. Last name, state, city and postcode checks remain manual; they use the same native validation mechanism and add lower-value repeated setup against the shared service.
 
-The default happy path includes optional company/address details and date of birth. Marketing opt-ins stay unchecked. A test marks its account immediately after the create request completes; the fixture then deletes it in teardown and verifies absence. Validation cases never create an account, so they skip cleanup. Any cleanup error fails the test. See [cleanup behavior and limits](../README.md#accounts-and-cleanup).
+The default happy path includes optional company/address details and date of birth. Marketing opt-ins stay unchecked. A test marks its account immediately before the create request; the fixture then attempts deletion in teardown and verifies absence, including when the client does not receive the creation response. Validation cases never create an account, so they skip cleanup. Any cleanup error fails the test. See [cleanup behavior and limits](../README.md#accounts-and-cleanup).
 
 ## Search and cart
 
