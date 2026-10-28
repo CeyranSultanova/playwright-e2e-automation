@@ -2,17 +2,7 @@
 
 Playwright and TypeScript tests for registration and product search on [Automation Exercise](https://automationexercise.com).
 
-The suite has 16 tests: 9 for registration, 5 for search and cart, and 2 for the ad handlers. The three smoke tests cover account creation, duplicate email rejection, and finding a product and adding it to the cart.
-
-## Evaluation checklist
-
-| Criterion | Implementation and evidence |
-| --- | --- |
-| Coverage and priorities | Three P0 smoke journeys plus P1 validation/search cases; deferred cases and reasons are in [test-design.md](docs/test-design.md). |
-| Structure and readability | Four small Page Objects, test-scoped fixtures and business assertions in test files; no base-page hierarchy. |
-| Reliability | DOM-based locators, condition-based waits, unique accounts, verified teardown, isolated contexts and ad-handler checks. |
-| CI and reporting | GitHub Actions workflow, locked dependencies, TypeScript check, parallel execution, HTML/JUnit reports and failure artifacts. Hosted CI execution is still pending. |
-| Technical reasoning | Setup, configuration, cleanup, ad handling, coverage tradeoffs and known limitations are explained below; actual run results are in [validation.md](docs/validation.md). |
+The live E2E suite has 14 tests: 9 for registration and 5 for search and cart. Three smoke tests cover account creation, duplicate email rejection, and finding a product and adding it to the cart. Two ad-helper checks run separately against controlled HTML; they do not count as live application coverage.
 
 ## Run locally
 
@@ -25,17 +15,19 @@ npm run typecheck
 npm test
 ```
 
-Tests run with two workers. Each test has its own browser context and data, so no account setup or test ordering is needed.
+Tests run with two workers and `fullyParallel: true`, including cases in the same file. Each test has a fresh browser context, and registration accounts are test-scoped. No shared account or execution order is required. Two workers keep the run short without sending excessive traffic to the shared public site.
 
 ```sh
 npm run test:headed       # Watch the browser
 npm run test:smoke        # Run the three main journeys
 npm run test:ui           # Open the interactive runner
+npm run test:helpers      # Check ad handlers against controlled HTML
 npm run report           # Open the HTML report
+npm run report:helpers   # Open the ad-helper report
 npm test -- --grep REG-02 # Run one case
 ```
 
-Run these commands one at a time in the same checkout; separate runs share the report folders.
+Repeated runs of the same suite share report folders; run them sequentially in one checkout. E2E and helper checks have separate output folders.
 
 ## Configuration
 
@@ -69,6 +61,8 @@ playwright-e2e/
 │       └── e2e.yml
 ├── config/
 │   └── test-data.json
+├── checks/
+│   └── ad-handling.spec.ts
 ├── docs/
 │   ├── test-design.md
 │   └── validation.md
@@ -84,23 +78,24 @@ playwright-e2e/
 │   └── settings.ts
 ├── tests/
 │   ├── registration.spec.ts
-│   ├── search.spec.ts
-│   └── ad-handling.spec.ts
+│   └── search.spec.ts
 ├── .env.example
 ├── .gitignore
 ├── package.json
 ├── package-lock.json
 ├── playwright.config.ts
+├── playwright.checks.config.ts
 ├── README.md
 └── tsconfig.json
 ```
 
 - `tests/` contains the scenarios and assertions. Case IDs link to [the test design](docs/test-design.md).
+- `checks/` verifies ad-helper behavior independently of live ad delivery. Its config inherits the shared browser and timeout settings.
 - `pages/` contains locators and actions for signup, product search, product details and cart. Business assertions stay in the test files; a shared search assertion lives in `search.spec.ts`.
 - `support/` handles configuration, account setup/cleanup and ads.
 - `.github/workflows/e2e.yml` runs the suite in GitHub Actions.
 
-Locators use `data-qa` and accessible roles where possible. Product cards and cart rows need a few CSS selectors because the site has no test IDs for them. Playwright assertions wait for the expected UI state; `networkidle` is avoided because ad requests can keep the page busy.
+Locators use `data-qa` and accessible roles where possible. Product cards and cart rows need a few CSS selectors because the site has no test IDs for them. Playwright assertions wait for the expected UI state; `networkidle` is avoided because ad requests can keep the page busy. Native validity flags and the unchanged form URL prove validation; focus is not a business requirement. The cart's quantity and total prove that quantity entry and Add to cart work together.
 
 Four required-field checks cover credentials, identity, delivery and contact details: password, first name, address and mobile. Each clears one field from a valid form and checks browser validity flags. Other required fields remain in the manual design to limit repeated browser/API work on the shared site.
 
@@ -108,13 +103,15 @@ Four required-field checks cover credentials, identity, delivery and contact det
 
 Each registration test generates a unique email, display name and password from the configured template. Emails use `ceyrantest+<UUID>@gmail.com`. Names include a short run suffix, and passwords include the full UUID. Country, date of birth and address values stay valid and configurable; catalogue expectations stay fixed so tests can detect unexpected product changes. The successful registration uses the full UI; the duplicate-email test creates its starting account through the [public API](https://automationexercise.com/api_list).
 
-Cleanup runs in a test-scoped fixture with its own timeout: delete the account, then verify that its credentials no longer work. It also runs after assertion failures, and the report includes the owned email for recovery. HTTP/schema guards in API helpers and teardown checks throw errors when setup or cleanup cannot be trusted. Business response assertions stay in the tests. Deletion and absence verification run before the email attachment, so a report-writing failure cannot prevent cleanup. A cleanup failure fails the test. Newsletter and partner-offer checkboxes stay unchecked.
+Once the account fixture starts, its `finally` block attempts deletion even after a test fails or validation prevents account creation. Cleanup has its own timeout. It accepts deletion response codes 200 (deleted) or 404 (already absent), then requires the login API to return 404 for those credentials. HTTP, schema or unexpected application responses fail the test; a failed deletion request stops further verification. API helpers check transport and response shape, while business assertions stay in the tests.
 
-The cart test removes its item at the end. Each browser context also has separate session cookies. Forced termination or an unavailable API can prevent cleanup; use the email in the failure trace to check the affected account.
+The `account-email` attachment is written only after deletion and absence verification succeed, so reporting cannot prevent cleanup. Forced termination or an unavailable API can leave an account behind; if the attachment is missing, inspect the signup/API request in the failure trace to recover its email. Newsletter and partner-offer checkboxes stay unchecked.
+
+The cart test removes its item after its assertions succeed. If it fails earlier, Playwright disposes its isolated browser context; there is no API cart cleanup or guarantee that server-side session data is purged.
 
 ## Ads and pop-ups
 
-Known advertising domains are blocked before navigation. If an ad loads, the handler clicks its close control inside a recognized ad frame. It also closes tabs that navigate to known ad domains. The cart confirmation and application tabs remain available; two controlled tests check this behavior.
+Known advertising domains are blocked before navigation. If an ad loads, the handler clicks its close control inside a recognized ad frame. It also closes tabs that navigate to known ad domains. The cart confirmation and application tabs remain available; `npm run test:helpers` checks both behaviors with intercepted responses.
 
 To try the suite with real ads enabled:
 
@@ -122,13 +119,13 @@ To try the suite with real ads enabled:
 BLOCK_ADS=false npm run test:headed
 ```
 
-Close handlers stay active in this mode. They apply to the Playwright browser only. New ad providers or consent dialogs may need additional handling. `AD_DOMAINS` controls the provider list. The ad-handler tests build controlled HTML pages directly; these are test harnesses, so they do not need application Page Objects.
+Close handlers stay active in this mode and apply to the Playwright browser only. `AD_DOMAINS` controls the provider list. New providers or consent dialogs may need additional handling. The helper checks cover known frame/tab patterns, not every live advertising provider; their synthetic pages do not need application Page Objects.
 
 ## CI and reports
 
-GitHub Actions runs on pull requests, pushes to `main`, and manual dispatch. It installs dependencies and Chromium, checks TypeScript, and runs tests with two workers. Repository variables `BASE_URL`, `WORKERS` and `TEST_DATA_FILE` override the target, concurrency and data file.
+GitHub Actions runs on pull requests, pushes to `main`, and manual dispatch. It installs locked dependencies and Chromium, checks TypeScript, then runs the helper checks and live E2E suite with two workers. The E2E step still runs if a helper check fails, provided type checking passed. Either suite's failure fails the job. Repository variables `BASE_URL`, `WORKERS` and `TEST_DATA_FILE` override the target, concurrency and data file.
 
-HTML and JUnit reports, plus failure traces, screenshots and videos, are uploaded as an artifact for seven days, including when tests fail. Locally, reports are in `playwright-report/` and `test-results/`. They can contain test credentials, so use test data only.
+HTML reports are in `playwright-report/e2e/` and `playwright-report/checks/`. JUnit XML and diagnostics are in the corresponding `test-results/e2e/` and `test-results/checks/` folders. The workflow uploads both parent folders as a seven-day artifact, including on failure. Download it from the Actions run and open the relevant HTML report with Playwright. This publishes a downloadable artifact, not a public report website. Traces, screenshots and videos are retained on failure and can contain credentials; use test data only.
 
 Retries are disabled locally and in CI. Every failed attempt remains a failed run. Automatic cancellation of an active CI run is disabled to give account cleanup a chance to finish.
 
@@ -136,7 +133,7 @@ Retries are disabled locally and in CI. Every failed attempt remains a failed ru
 
 - Search matches categories too: `top` returns some shirts. The partial-name test uses `blue` and checks every result name.
 - Empty search shows the full catalogue.
-- The public site has produced navigation/API timeouts and confirmed HTTP 503 overload responses. The latest full run had three service failures; they remain visible in the report. Clicks that navigate now return without waiting for page loading; the next locator assertion checks readiness. Search waits for its query URL and DOM content to avoid reading results from the previous query. Each report includes main-frame response timing. See [execution results](docs/validation.md) for the investigation and latest run.
+- The public site has produced navigation/API timeouts and HTTP 503 overload responses. Navigation clicks return without waiting for page loading; the next locator assertion checks readiness. Search waits for its query URL and DOM content to avoid reading previous results. Main-frame response timing is attached for diagnosis. See [execution results](docs/validation.md) for actual outcomes.
 - Product data belongs to the site and can change. Update expected values only after checking the change.
 - Other browsers and remote CI have not been verified. Mobile, accessibility, performance and security testing are outside this suite.
 

@@ -7,7 +7,6 @@ async function expectMatchingNames(products: ProductsPage, term: string) {
   await expect(products.heading).toHaveText('Searched Products');
   await expect(products.names.first()).toBeVisible();
   const names = await products.names.allTextContents();
-  expect(names.length).toBeGreaterThan(0);
   for (const name of names) expect(name.toLowerCase()).toContain(term.toLowerCase());
 }
 
@@ -21,7 +20,6 @@ test('SEARCH-01 @smoke adds the searched product to the cart', async ({ page, pr
   const expected = data.product;
   await products.search(expected.name);
   await expectMatchingNames(products, expected.name);
-  await expect(products.card(expected.name)).toHaveCount(1);
   await products.openProduct(expected.name);
   await expect(product.name).toHaveText(expected.name);
   await expect(page).toHaveURL(new RegExp(`/product_details/${expected.id}$`));
@@ -29,10 +27,7 @@ test('SEARCH-01 @smoke adds the searched product to the cart', async ({ page, pr
   await expect(product.availability).toHaveText(`Availability: ${expected.availability}`);
   await expect(product.quantity).toHaveValue('1');
   await product.setQuantity(expected.quantity);
-  await expect(product.quantity).toHaveValue(String(expected.quantity));
-  await expect(product.addButton).toBeEnabled();
   await product.addToCart();
-  await expect(product.confirmation).toBeVisible();
   await expect(product.addedMessage).toBeVisible();
   await product.viewCart();
   await expect(cart.name(expected.id)).toHaveText(expected.name);
@@ -40,7 +35,6 @@ test('SEARCH-01 @smoke adds the searched product to the cart', async ({ page, pr
   await expect(cart.quantity(expected.id)).toHaveText(String(expected.quantity));
   await expect(cart.total(expected.id)).toHaveText(`Rs. ${expected.unitPrice * expected.quantity}`);
   await cart.remove(expected.id);
-  await expect(cart.row(expected.id)).toHaveCount(0);
   await expect(cart.emptyMessage).toBeVisible();
 });
 

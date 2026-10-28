@@ -9,6 +9,7 @@ const profiles = {
 
 export default defineConfig({
   testDir: './tests',
+  outputDir: './test-results/e2e',
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: 0,
@@ -17,8 +18,8 @@ export default defineConfig({
   expect: { timeout: settings.expectTimeout },
   reporter: [
     ['list'],
-    ['html', { open: 'never' }],
-    ['junit', { outputFile: 'test-results/junit.xml' }],
+    ['html', { open: 'never', outputFolder: 'playwright-report/e2e' }],
+    ['junit', { outputFile: 'test-results/e2e/junit.xml' }],
   ],
   use: {
     baseURL: settings.baseURL,

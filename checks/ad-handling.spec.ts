@@ -40,5 +40,4 @@ test('ADS-02 closes ad tabs and keeps application tabs open', async ({ page, con
   await page.getByRole('link', { name: 'Application', exact: true }).click();
   const application = await applicationOpened;
   await expect(application.locator('body')).toHaveText('Application tab');
-  expect(application.isClosed()).toBe(false);
 });
