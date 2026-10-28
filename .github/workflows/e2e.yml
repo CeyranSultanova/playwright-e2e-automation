@@ -16,7 +16,8 @@ jobs:
     env:
       CI: 'true'
       BASE_URL: ${{ vars.BASE_URL || 'https://automationexercise.com' }}
-      WORKERS: ${{ vars.WORKERS || '2' }}
+      # The target is a shared public service; serial CI traffic prevents queue-full responses.
+      WORKERS: ${{ vars.WORKERS || '1' }}
       TEST_DATA_FILE: ${{ vars.TEST_DATA_FILE || 'config/test-data.json' }}
     steps:
       - uses: actions/checkout@v4

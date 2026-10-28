@@ -1,13 +1,13 @@
 # Execution results
 
-Local verification against `https://automationexercise.com` on 28 October 2026, using Chromium. Latest verification includes the product/cart navigation readiness fix.
+Local verification against `https://automationexercise.com` on 28 October 2026, using Chromium. Latest verification includes the product/cart navigation, CI worker and cleanup changes.
 
 | Check | Result |
 | --- | --- |
 | TypeScript | Passed |
 | Test discovery | 14 live E2E cases; 2 separate helper checks |
 | Ad helpers, 2 workers, zero retries | **2 passed in 2.1 seconds** |
-| Latest live E2E suite, 2 workers, zero retries | **14 passed in 28.2 seconds** |
+| Latest live E2E suite, 1 worker, zero retries | **14 passed in 49.8 seconds** |
 | Isolated cart journey after the readiness fix | **1 passed in 5.4 seconds** |
 | Report generation | Separate, nonempty HTML reports and valid JUnit XML for both suites |
 | Workflow configuration | YAML parses; both suites are configured to run and upload reports, including on failure |

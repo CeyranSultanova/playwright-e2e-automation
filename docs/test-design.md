@@ -6,7 +6,7 @@ The main risks are a customer being unable to register, getting misleading searc
 - **P1:** Common errors and validation; included in the full suite where automated.
 - **P2:** Additional edge cases or behavior that needs a requirement clarified.
 
-Each registration test gets a unique email and attempts API cleanup, including the validation tests. Search tests use the shared catalogue and separate browser sessions. Case IDs match the test names; parameterized cases add a field or query variant to the ID.
+Each registration test gets a unique email. Tests that create an account mark it for API cleanup; browser-only validation cases do not create an account and therefore do not make cleanup API calls. Search tests use the shared catalogue and separate browser sessions. Case IDs match the test names; parameterized cases add a field or query variant to the ID.
 
 ## Registration
 
@@ -21,7 +21,7 @@ Each registration test gets a unique email and attempts API cleanup, including t
 
 REG-05 runs for password, first name, address and mobile: credentials, identity, delivery and contact information. Clearing one field at a time avoids the first invalid field hiding a later one. Last name, state, city and postcode checks remain manual; they use the same native validation mechanism and add lower-value repeated setup against the shared service.
 
-The default happy path includes optional company/address details and date of birth. Marketing opt-ins stay unchecked. Every initialized account fixture attempts deletion in teardown, followed by an absence check if deletion succeeds or reports an already absent account. Any cleanup error fails the test. See [cleanup behavior and limits](../README.md#accounts-and-cleanup).
+The default happy path includes optional company/address details and date of birth. Marketing opt-ins stay unchecked. A test marks its account immediately after the create request completes; the fixture then deletes it in teardown and verifies absence. Validation cases never create an account, so they skip cleanup. Any cleanup error fails the test. See [cleanup behavior and limits](../README.md#accounts-and-cleanup).
 
 ## Search and cart
 

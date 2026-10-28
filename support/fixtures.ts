@@ -8,7 +8,7 @@ import { ProductPage } from '../pages/product-page';
 import { CartPage } from '../pages/cart-page';
 
 type Fixtures = {
-  account: Account;
+  account: Account & { markCreated(): void };
   signup: SignupPage;
   products: ProductsPage;
   product: ProductPage;
@@ -45,10 +45,16 @@ export const test = base.extend<Fixtures>({
     }
   },
   account: [async ({ request }, use, testInfo) => {
-    const account = newAccount();
+    let created = false;
+    const account = newAccount() as Account & { markCreated(): void };
+    Object.defineProperty(account, 'markCreated', {
+      value: () => { created = true; },
+      enumerable: false,
+    });
     try {
       await use(account);
     } finally {
+      if (!created) return;
       // Creation can succeed before a test fails, so always attempt cleanup.
       const deleted = await deleteAccount(request, account);
       if (![200, 404].includes(deleted.responseCode)) {
