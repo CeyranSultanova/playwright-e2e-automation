@@ -13,7 +13,6 @@ test('REG-01 @smoke creates an account and logs in', async ({ signup, account })
   await expect(signup.email).toHaveValue(account.email);
   await signup.fillDetails(account);
   await signup.create();
-  account.markCreated();
   await expect(signup.createdMessage).toHaveText('Account Created!');
   await signup.continueToHome();
   await expect(signup.loggedInAs(account.name)).toBeVisible();
@@ -22,7 +21,6 @@ test('REG-01 @smoke creates an account and logs in', async ({ signup, account })
 
 test('REG-02 @smoke rejects an already registered email', async ({ signup, request, account }) => {
   expect(await createAccount(request, account)).toMatchObject({ responseCode: 201, message: 'User created!' });
-  account.markCreated();
   await signup.start(account);
   await expect(signup.duplicateEmailMessage).toBeVisible();
   await expect(signup.logoutLink).toHaveCount(0);
