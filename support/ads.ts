@@ -19,8 +19,14 @@ function isAdFrame(frame: Frame): boolean {
 }
 
 export async function handleAdOverlays(page: Page) {
-  // Check before actions: ads can appear after navigation or a previous click.
-  await page.addLocatorHandler(page.locator('body'), async () => {
+  const adFrameSelector = [
+    'iframe[id^="google_ads_iframe"]',
+    'iframe[title*="Advertisement" i]',
+    ...settings.adDomains.map(domain => `iframe[src*="${domain}"]`),
+  ].join(', ');
+
+  // Run only when a known advertising frame can block an action.
+  await page.addLocatorHandler(page.locator(adFrameSelector).filter({ visible: true }).first(), async () => {
     for (const frame of page.frames().filter(isAdFrame)) {
       const close = frame.locator('#dismiss-button, [aria-label="Close ad"], [aria-label="Close Ad"]')
         .or(frame.getByRole('button', { name: /^(close|close ad|dismiss)$/i }));

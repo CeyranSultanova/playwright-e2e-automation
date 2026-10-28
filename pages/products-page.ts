@@ -14,7 +14,15 @@ export class ProductsPage {
 
   async search(term: string) {
     await this.page.locator('#search_product').fill(term);
+    const searchResponse = this.page.waitForResponse(response => {
+      const url = new URL(response.url());
+      return response.request().isNavigationRequest() &&
+        url.pathname === '/products' &&
+        (url.searchParams.get('search') ?? '') === term;
+    });
     await this.page.locator('#submit_search').click({ noWaitAfter: true });
+    const response = await searchResponse;
+    if (!response.ok()) throw new Error(`Product search returned HTTP ${response.status()}`);
     await this.page.waitForURL(url => url.pathname === '/products' && url.searchParams.get('search') === term, {
       waitUntil: 'domcontentloaded',
     });

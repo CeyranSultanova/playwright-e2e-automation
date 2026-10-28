@@ -1,4 +1,4 @@
-import { test as base, expect } from '@playwright/test';
+import { test as base, expect, type Dialog, type Page } from '@playwright/test';
 import { newAccount, deleteAccount, verifyAccount, type Account } from './accounts';
 import { isAdUrl, handleAdOverlays, handleAdPopup } from './ads';
 import { settings } from './settings';
@@ -8,7 +8,7 @@ import { ProductPage } from '../pages/product-page';
 import { CartPage } from '../pages/cart-page';
 
 type Fixtures = {
-  account: Account;
+  account: Account & { markCreated(): void };
   signup: SignupPage;
   products: ProductsPage;
   product: ProductPage;
@@ -45,10 +45,16 @@ export const test = base.extend<Fixtures>({
     }
   },
   account: [async ({ request }, use, testInfo) => {
-    const account = newAccount();
+    let created = false;
+    const account = newAccount() as Account & { markCreated(): void };
+    Object.defineProperty(account, 'markCreated', {
+      value: () => { created = true; },
+      enumerable: false,
+    });
     try {
       await use(account);
     } finally {
+      if (!created) return;
       // Creation can succeed before a test fails, so always attempt cleanup.
       const deleted = await deleteAccount(request, account);
       if (![200, 404].includes(deleted.responseCode)) {
@@ -66,12 +72,35 @@ export const test = base.extend<Fixtures>({
     if (settings.blockAds) {
       await context.route('**/*', route => isAdUrl(route.request().url()) ? route.abort() : route.continue());
     }
-    context.on('page', page => page.on('dialog', async dialog => {
-      const message = dialog.message();
-      await dialog.dismiss();
-      throw new Error(`Unexpected ${dialog.type()} dialog: ${message}`);
-    }));
-    await use();
+    const unexpectedDialogs: string[] = [];
+    const pendingDismissals = new Set<Promise<void>>();
+    const listeners = new Map<Page, (dialog: Dialog) => void>();
+
+    const watchDialogs = (page: Page) => {
+      if (listeners.has(page)) return;
+      const onDialog = (dialog: Dialog) => {
+        unexpectedDialogs.push(`${dialog.type()}: ${dialog.message()}`);
+        const dismissal = dialog.dismiss()
+          .catch(error => { unexpectedDialogs.push(`dismiss failed: ${String(error)}`); })
+          .finally(() => { pendingDismissals.delete(dismissal); });
+        pendingDismissals.add(dismissal);
+      };
+      listeners.set(page, onDialog);
+      page.on('dialog', onDialog);
+    };
+
+    context.pages().forEach(watchDialogs);
+    context.on('page', watchDialogs);
+    try {
+      await use();
+    } finally {
+      context.off('page', watchDialogs);
+      for (const [page, listener] of listeners) page.off('dialog', listener);
+      await Promise.allSettled(pendingDismissals);
+      if (unexpectedDialogs.length) {
+        throw new Error(`Unexpected browser dialog(s): ${unexpectedDialogs.join(' | ')}`);
+      }
+    }
   }, { auto: true }],
 });
 export { expect };

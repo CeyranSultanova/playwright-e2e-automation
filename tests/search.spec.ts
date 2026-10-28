@@ -5,9 +5,11 @@ import { data } from '../support/settings';
 
 async function expectMatchingNames(products: ProductsPage, term: string) {
   await expect(products.heading).toHaveText('Searched Products');
-  await expect(products.names.first()).toBeVisible();
-  const names = await products.names.allTextContents();
-  for (const name of names) expect(name.toLowerCase()).toContain(term.toLowerCase());
+  await expect(async () => {
+    const names = await products.names.allTextContents();
+    expect(names.length).toBeGreaterThan(0);
+    for (const name of names) expect(name.toLowerCase()).toContain(term.toLowerCase());
+  }).toPass();
 }
 
 test.beforeEach(async ({ products }) => {

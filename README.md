@@ -95,7 +95,7 @@ playwright-e2e/
 - `support/` handles configuration, account setup/cleanup and ads.
 - `.github/workflows/e2e.yml` runs the suite in GitHub Actions.
 
-Locators use `data-qa` and accessible roles where possible. Product cards and cart rows need a few CSS selectors because the site has no test IDs for them. Playwright assertions wait for the expected UI state; `networkidle` is avoided because ad requests can keep the page busy. Product and cart navigation also wait for `DOMContentLoaded`: their buttons can become visible before the synchronous cart script attaches click handlers. Native validity flags and the unchanged form URL prove validation; focus is not a business requirement. The cart's quantity and total prove that quantity entry and Add to cart work together.
+Locators use `data-qa` and accessible roles where possible. Product cards and cart rows need a few CSS selectors because the site has no test IDs for them. Playwright assertions wait for the expected UI state; `networkidle` is avoided because ad requests can keep the page busy. Search waits for its document response, checks its HTTP status, and then waits for `DOMContentLoaded`; matching-name assertions retry until a nonempty result set is ready. Product and cart navigation also wait for `DOMContentLoaded`: their buttons can become visible before the synchronous cart script attaches click handlers. Native validity flags and the unchanged form URL prove validation; focus is not a business requirement. The cart's quantity and total prove that quantity entry and Add to cart work together.
 
 Four required-field checks cover credentials, identity, delivery and contact details: password, first name, address and mobile. Each clears one field from a valid form and checks browser validity flags. Other required fields remain in the manual design to limit repeated browser/API work on the shared site.
 
@@ -103,7 +103,7 @@ Four required-field checks cover credentials, identity, delivery and contact det
 
 Each registration test generates a unique email, display name and password from the configured template. Emails use `ceyrantest+<UUID>@gmail.com`. Names include a short run suffix, and passwords include the full UUID. Country, date of birth and address values stay valid and configurable; catalogue expectations stay fixed so tests can detect unexpected product changes. The successful registration uses the full UI; the duplicate-email test creates its starting account through the [public API](https://automationexercise.com/api_list).
 
-Once the account fixture starts, its `finally` block attempts deletion even after a test fails or validation prevents account creation. Cleanup has its own timeout. It accepts deletion response codes 200 (deleted) or 404 (already absent), then requires the login API to return 404 for those credentials. HTTP, schema or unexpected application responses fail the test; a failed deletion request stops further verification. API helpers check transport and response shape, while business assertions stay in the tests.
+Tests mark an account immediately after the create request completes. Only marked accounts enter the fixture's cleanup `finally` block, so validation-only cases do not send unnecessary delete/verify requests. Cleanup still runs after a marked test fails and has its own timeout. It accepts deletion response codes 200 (deleted) or 404 (already absent), then requires the login API to return 404 for those credentials. HTTP, schema or unexpected application responses fail the test; a failed deletion request stops further verification. API helpers check transport and response shape, while business assertions stay in the tests.
 
 The `account-email` attachment is written only after deletion and absence verification succeed, so reporting cannot prevent cleanup. Forced termination or an unavailable API can leave an account behind; if the attachment is missing, inspect the signup/API request in the failure trace to recover its email. Newsletter and partner-offer checkboxes stay unchecked.
 
@@ -111,7 +111,7 @@ The cart test removes its item after its assertions succeed. If it fails earlier
 
 ## Ads and pop-ups
 
-Known advertising domains are blocked before navigation. If an ad loads, the handler clicks its close control inside a recognized ad frame. It also closes tabs that navigate to known ad domains. The cart confirmation and application tabs remain available; `npm run test:helpers` checks both behaviors with intercepted responses.
+Known advertising domains are blocked before navigation. The overlay handler is triggered by a visible advertising iframe rather than the always-visible page body, then clicks a close control inside a recognized ad frame. It also closes tabs that navigate to known ad domains. Unexpected browser dialogs are dismissed immediately, recorded, and reported once during fixture teardown so asynchronous event errors cannot be lost. The cart confirmation and application tabs remain available; `npm run test:helpers` checks both ad behaviors with intercepted responses.
 
 To try the suite with real ads enabled:
 
