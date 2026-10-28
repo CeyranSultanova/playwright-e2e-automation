@@ -14,5 +14,8 @@ export class ProductPage {
 
   async setQuantity(quantity: number) { await this.quantity.fill(String(quantity)); }
   async addToCart() { await this.addButton.click(); }
-  async viewCart() { await this.confirmation.getByRole('link', { name: 'View Cart' }).click({ noWaitAfter: true }); }
+  async viewCart() {
+    await this.confirmation.getByRole('link', { name: 'View Cart' }).click({ noWaitAfter: true });
+    await this.page.waitForURL(/\/view_cart$/, { waitUntil: 'domcontentloaded' });
+  }
 }

@@ -95,7 +95,7 @@ playwright-e2e/
 - `support/` handles configuration, account setup/cleanup and ads.
 - `.github/workflows/e2e.yml` runs the suite in GitHub Actions.
 
-Locators use `data-qa` and accessible roles where possible. Product cards and cart rows need a few CSS selectors because the site has no test IDs for them. Playwright assertions wait for the expected UI state; `networkidle` is avoided because ad requests can keep the page busy. Native validity flags and the unchanged form URL prove validation; focus is not a business requirement. The cart's quantity and total prove that quantity entry and Add to cart work together.
+Locators use `data-qa` and accessible roles where possible. Product cards and cart rows need a few CSS selectors because the site has no test IDs for them. Playwright assertions wait for the expected UI state; `networkidle` is avoided because ad requests can keep the page busy. Product and cart navigation also wait for `DOMContentLoaded`: their buttons can become visible before the synchronous cart script attaches click handlers. Native validity flags and the unchanged form URL prove validation; focus is not a business requirement. The cart's quantity and total prove that quantity entry and Add to cart work together.
 
 Four required-field checks cover credentials, identity, delivery and contact details: password, first name, address and mobile. Each clears one field from a valid form and checks browser validity flags. Other required fields remain in the manual design to limit repeated browser/API work on the shared site.
 

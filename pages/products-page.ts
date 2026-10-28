@@ -22,5 +22,7 @@ export class ProductsPage {
 
   async openProduct(name: string) {
     await this.card(name).getByRole('link', { name: 'View Product' }).click({ noWaitAfter: true });
+    // The cart button can be visible before its synchronous click handler is installed.
+    await this.page.waitForURL(/\/product_details\/\d+$/, { waitUntil: 'domcontentloaded' });
   }
 }
