@@ -11,7 +11,12 @@ Local verification against `https://automationexercise.com` on 28 October 2026, 
 | Isolated cart journey after the readiness fix | **1 passed in 5.4 seconds** |
 | Report generation | Separate, nonempty HTML reports and valid JUnit XML for both suites |
 | Workflow configuration | YAML parses; both suites are configured to run and upload reports, including on failure |
-| Other browsers / hosted GitHub Actions | Not run |
+| Hosted GitHub Actions | Executed; HTML/JUnit reports and failure diagnostics were uploaded as an artifact |
+| Other browsers | Not run |
+
+## Latest hosted CI run
+
+The latest observed GitHub Actions run completed 13 of 14 live E2E tests. `REG-05-address` failed in the shared setup while waiting for the Signup / Login page heading, before the address-validation scenario started. The run published its screenshot, video, trace and HTML/JUnit reports for diagnosis. This result confirms the hosted workflow and report publishing, but it is not a clean E2E pass.
 
 ## Earlier server-failure run
 
@@ -50,4 +55,4 @@ Navigation clicks return without waiting for full page loading, and tests assert
 
 Main-frame response timings are attached for diagnosis. The inspected traces proved server overload for the four failures in that run, but do not establish the cause of every timeout. Increasing assertion timeouts would not repair an HTTP 503 response.
 
-Repeated runs of the same suite must use separate report/output folders or execute sequentially. The E2E and helper configs now use distinct folders. Hosted report uploads still need verification after the repository is published.
+Repeated runs of the same suite must use separate report/output folders or execute sequentially. The E2E and helper configs now use distinct folders. Hosted artifact publishing has been verified; the latest observed hosted E2E run is recorded above.
