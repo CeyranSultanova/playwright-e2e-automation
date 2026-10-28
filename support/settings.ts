@@ -32,8 +32,11 @@ export const data: typeof defaults = JSON.parse(
   fs.readFileSync(path.resolve(process.env.TEST_DATA_FILE || 'config/test-data.json'), 'utf8'),
 );
 
+const optionalUserFields = new Set<string>(['company', 'address2']);
 for (const key of Object.keys(defaults.user) as (keyof typeof defaults.user)[]) {
-  if (typeof data.user?.[key] !== 'string' || !data.user[key]) throw new Error(`Missing user.${key} in test data`);
+  const value = data.user?.[key];
+  if (typeof value !== 'string') throw new Error(`user.${key} must be a string`);
+  if (!optionalUserFields.has(key) && !value.trim()) throw new Error(`Missing user.${key} in test data`);
 }
 
 const product = data.product;

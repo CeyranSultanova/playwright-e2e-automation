@@ -4,6 +4,16 @@ Playwright and TypeScript tests for registration and product search on [Automati
 
 The suite has 16 tests: 9 for registration, 5 for search and cart, and 2 for the ad handlers. The three smoke tests cover account creation, duplicate email rejection, and finding a product and adding it to the cart.
 
+## Evaluation checklist
+
+| Criterion | Implementation and evidence |
+| --- | --- |
+| Coverage and priorities | Three P0 smoke journeys plus P1 validation/search cases; deferred cases and reasons are in [test-design.md](docs/test-design.md). |
+| Structure and readability | Four small Page Objects, test-scoped fixtures and business assertions in test files; no base-page hierarchy. |
+| Reliability | DOM-based locators, condition-based waits, unique accounts, verified teardown, isolated contexts and ad-handler checks. |
+| CI and reporting | GitHub Actions workflow, locked dependencies, TypeScript check, parallel execution, HTML/JUnit reports and failure artifacts. Hosted CI execution is still pending. |
+| Technical reasoning | Setup, configuration, cleanup, ad handling, coverage tradeoffs and known limitations are explained below; actual run results are in [validation.md](docs/validation.md). |
+
 ## Run locally
 
 Use Node.js 22 or newer.
@@ -39,7 +49,7 @@ Copy `.env.example` to `.env` to change the defaults. Environment variables over
 | `BROWSERS` | `chromium` | Comma-separated browser names |
 | `BLOCK_ADS` | `true` | Set to `false` to load real ads |
 
-Edit [config/test-data.json](config/test-data.json) to change the name, address, email prefix/domain, password or product expectations. A replacement file must use the same structure. The target must have compatible UI/API routes and the configured product. Keep `price` and `unitPrice` consistent, and use a quantity greater than one.
+Edit [config/test-data.json](config/test-data.json) to change the name, address, email prefix/domain, password or product expectations. A replacement file must use the same structure. Optional `company` and `address2` values may be empty strings. The target must have compatible UI/API routes and the configured product. Keep `price` and `unitPrice` consistent, and use a quantity greater than one.
 
 For another browser, install it first, then select it:
 
@@ -98,7 +108,7 @@ Four required-field checks cover credentials, identity, delivery and contact det
 
 Each registration test generates a unique email, display name and password from the configured template. Emails use `ceyrantest+<UUID>@gmail.com`. Names include a short run suffix, and passwords include the full UUID. Country, date of birth and address values stay valid and configurable; catalogue expectations stay fixed so tests can detect unexpected product changes. The successful registration uses the full UI; the duplicate-email test creates its starting account through the [public API](https://automationexercise.com/api_list).
 
-Cleanup runs in a test-scoped fixture with its own timeout: delete the account, then verify that its credentials no longer work. It also runs after assertion failures, and the report includes the owned email for recovery. HTTP/schema guards in API helpers and teardown checks throw errors when setup or cleanup cannot be trusted. Business response assertions stay in the tests. A cleanup failure fails the test. Newsletter and partner-offer checkboxes stay unchecked.
+Cleanup runs in a test-scoped fixture with its own timeout: delete the account, then verify that its credentials no longer work. It also runs after assertion failures, and the report includes the owned email for recovery. HTTP/schema guards in API helpers and teardown checks throw errors when setup or cleanup cannot be trusted. Business response assertions stay in the tests. Deletion and absence verification run before the email attachment, so a report-writing failure cannot prevent cleanup. A cleanup failure fails the test. Newsletter and partner-offer checkboxes stay unchecked.
 
 The cart test removes its item at the end. Each browser context also has separate session cookies. Forced termination or an unavailable API can prevent cleanup; use the email in the failure trace to check the affected account.
 
@@ -126,7 +136,7 @@ Retries are disabled locally and in CI. Every failed attempt remains a failed ru
 
 - Search matches categories too: `top` returns some shirts. The partial-name test uses `blue` and checks every result name.
 - Empty search shows the full catalogue.
-- The public site has produced navigation and API timeouts. Clicks that navigate now return without waiting for page loading; the next locator assertion checks readiness. Search waits for its query URL and DOM content to avoid reading results from the previous query. Each report includes main-frame response timing. See [execution results](docs/validation.md) for the investigation and latest run.
+- The public site has produced navigation/API timeouts and confirmed HTTP 503 overload responses. The latest full run had three service failures; they remain visible in the report. Clicks that navigate now return without waiting for page loading; the next locator assertion checks readiness. Search waits for its query URL and DOM content to avoid reading results from the previous query. Each report includes main-frame response timing. See [execution results](docs/validation.md) for the investigation and latest run.
 - Product data belongs to the site and can change. Update expected values only after checking the change.
 - Other browsers and remote CI have not been verified. Mobile, accessibility, performance and security testing are outside this suite.
 

@@ -4,14 +4,20 @@ Local verification against `https://automationexercise.com` on 28 October 2026, 
 
 | Check | Result |
 | --- | --- |
-| Refactored suite, 2 workers, zero retries | **16 passed in 27.0 seconds** |
-| Three smoke cases, headed, real ads enabled, 1 worker | **3 passed in 16.6 seconds** |
-| Registration cleanup in the full suite | Passed for all 9 cases |
-| Cleanup after a deliberate assertion failure | Independent API verification returned 404 (account absent) |
+| Latest full suite, 2 workers, zero retries | **13 passed, 3 failed in 1.4 minutes** |
+| REG-02 and REG-05-mobile_number | `/login` returned HTTP 503 and displayed the site's heavy-load / queue-full page |
+| REG-05-address | UI validation completed; the account-absence API check returned HTTP 503 |
+| Independent check after the cleanup API 503 | Account confirmed absent with application responseCode 404; original test stays failed |
+| Blank optional company/address2 fields | REG-01 passed separately in 12.5 seconds, including account cleanup |
+| Report-attachment failure probe | Mocked DELETE ran once before the deliberate attachment error; previously it ran zero times |
 | TypeScript and test discovery | Passed; 16 cases |
 | Other browsers / GitHub Actions | Not run |
 
-The full-suite HTML report remains in `playwright-report/`. The headed smoke run used a separate output folder and list reporter to preserve it. Navigation timing and account-email attachments are available in the report. The ad-handler checks use controlled responses because live ads do not appear consistently.
+The latest full run is not a clean pass. Its failures remain in the HTML/JUnit reports. Traces confirm HTTP 503 responses; increasing waits or retrying automatically would hide the site's availability problem.
+
+The optional-field check used a separate output folder and list reporter, preserving the full-run report. The attachment-failure probe used a mocked API outside the project and deliberately failed reporting; deletion still completed. No additional cases were added to the 16-case suite.
+
+Before these two review fixes, the refactored suite passed all 16 tests in 27.0 seconds, and the three headed smoke cases passed with real ads enabled in 16.6 seconds. Those are historical results, not the latest run. Navigation timing and owned-email attachments are available when their collection completes.
 
 ## Navigation timeout investigation
 
@@ -19,7 +25,7 @@ The previous 20-case suite had one failure after the Signup / Login click. The c
 
 The revised Page Objects return from navigation clicks without waiting for page loading. Tests then wait for a meaningful destination locator. The signup heading uses the configured navigation timeout. Search waits for the submitted query URL and DOM content before checking results, including when the heading is unchanged. This prevents the empty-query case from passing against the previous page.
 
-Retries are disabled in both local and CI runs. Main-frame response timings are attached for future failures. The clean parallel run recorded 40 responses with status 200 or 302; the largest response-start time was 1,306.723 ms. No navigation timeout occurred in this run or the headed smoke run. These successful runs do not rule out future service delays.
+Retries are disabled in both local and CI runs. Main-frame response timings are attached for future failures. The clean parallel run recorded 40 responses with status 200 or 302; the largest response-start time was 1,306.723 ms. No navigation timeout occurred in that earlier run or its headed smoke run. The latest run now provides concrete evidence of server overload: two login responses and one API response returned HTTP 503. This does not prove that every earlier timeout had the same cause.
 
 ## Findings retained in the tests
 

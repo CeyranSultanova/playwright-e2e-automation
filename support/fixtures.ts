@@ -50,7 +50,6 @@ export const test = base.extend<Fixtures>({
       await use(account);
     } finally {
       // Creation can succeed before a test fails, so always attempt cleanup.
-      await testInfo.attach('account-email', { body: account.email, contentType: 'text/plain' });
       const deleted = await deleteAccount(request, account);
       if (![200, 404].includes(deleted.responseCode)) {
         throw new Error(`Cleanup failed for ${account.email}: ${deleted.message}`);
@@ -59,6 +58,8 @@ export const test = base.extend<Fixtures>({
       if (verified.responseCode !== 404) {
         throw new Error(`Cleanup could not confirm account absence: ${account.email}`);
       }
+      // Reporting must not prevent account deletion.
+      await testInfo.attach('account-email', { body: account.email, contentType: 'text/plain' });
     }
   }, { timeout: settings.cleanupTimeout }],
   adIsolation: [async ({ context }, use) => {
