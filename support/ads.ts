@@ -2,8 +2,12 @@ import type { Frame, Page } from '@playwright/test';
 import { settings } from './settings';
 
 export function isAdUrl(url: string): boolean {
-  if (!URL.canParse(url)) return false;
-  const { hostname } = new URL(url);
+  let hostname: string;
+  try {
+    hostname = new URL(url).hostname;
+  } catch {
+    return false;
+  }
   return settings.adDomains.some(domain => hostname === domain || hostname.endsWith(`.${domain}`));
 }
 
@@ -35,7 +39,9 @@ export function handleAdPopup(popup: Page) {
     if (!popup.isClosed() && isAdUrl(popup.url())) await popup.close();
   };
   popup.on('framenavigated', frame => {
-    if (frame === popup.mainFrame()) void closeIfAd();
+    if (frame === popup.mainFrame()) {
+      void closeIfAd().catch(() => undefined);
+    }
   });
-  return closeIfAd();
+  return closeIfAd().catch(() => undefined);
 }
